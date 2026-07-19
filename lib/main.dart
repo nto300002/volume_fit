@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'src/app/app_environment.dart';
 import 'src/app/volume_fit_app.dart';
 
 void main() {
-  runApp(VolumeFitApp(environment: AppEnvironmentConfig.current()));
+  runApp(const ProviderScope(child: VolumeFitApp()));
 }
 
 typedef MyApp = VolumeFitApp;
