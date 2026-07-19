@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/app_environment.dart';
+
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, required this.environment});
+
+  final AppEnvironmentConfig environment;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Volume Fit'),
-        centerTitle: false,
-      ),
+      appBar: AppBar(title: const Text('Volume Fit'), centerTitle: false),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
@@ -21,11 +22,37 @@ class HomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (environment.showsEnvironmentLabel) ...[
+                  Align(
+                    alignment: Alignment.center,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          environment.label,
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 Text(
                   '筋トレ記録をAIへつなぐ',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    fontWeight: FontWeight.w700,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -35,10 +62,7 @@ class HomeScreen extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                FilledButton(
-                  onPressed: () {},
-                  child: const Text('トレーニングを開始'),
-                ),
+                FilledButton(onPressed: () {}, child: const Text('トレーニングを開始')),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () {},
