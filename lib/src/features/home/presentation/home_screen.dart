@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/app_environment.dart';
+import '../../../app/app_providers.dart';
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, required this.environment});
-
-  final AppEnvironmentConfig environment;
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final environment = ref.watch(appEnvironmentProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Volume Fit'), centerTitle: false),
