@@ -15,6 +15,8 @@ abstract interface class AuthRepository {
     required String email,
     required String password,
   });
+
+  Future<AuthUser> loginWithGoogle();
 }
 
 class AuthUser {
@@ -92,6 +94,30 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
+  @override
+  Future<AuthUser> loginWithGoogle() async {
+    try {
+      final provider = GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+
+      final credential = await _auth.signInWithPopup(provider);
+      final user = credential.user;
+
+      if (user == null) {
+        throw const AuthFailure('Googleログインに失敗しました');
+      }
+
+      return AuthUser(
+        uid: user.uid,
+        email: user.email ?? '',
+        emailVerified: user.emailVerified,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw AuthFailure(_googleLoginMessageForCode(error.code));
+    }
+  }
+
   String _registrationMessageForCode(String code) {
     return switch (code) {
       'invalid-email' => 'メールアドレスの形式を確認してください',
@@ -112,6 +138,17 @@ class FirebaseAuthRepository implements AuthRepository {
       'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
       'network-request-failed' => '通信に失敗しました。接続を確認してください',
       _ => 'ログインに失敗しました。時間をおいて再度お試しください',
+    };
+  }
+
+  String _googleLoginMessageForCode(String code) {
+    return switch (code) {
+      'popup-closed-by-user' ||
+      'cancelled-popup-request' => 'Googleログインがキャンセルされました',
+      'account-exists-with-different-credential' => '同じメールアドレスの別ログイン方法が登録されています',
+      'operation-not-allowed' => 'Googleログインが有効になっていません',
+      'network-request-failed' => '通信に失敗しました。接続を確認してください',
+      _ => 'Googleログインに失敗しました',
     };
   }
 }

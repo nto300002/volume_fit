@@ -79,4 +79,9 @@ class FakeAuthRepository implements AuthRepository {
   }) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<AuthUser> loginWithGoogle() {
+    throw UnimplementedError();
+  }
 }

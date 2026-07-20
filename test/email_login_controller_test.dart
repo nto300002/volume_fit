@@ -92,4 +92,9 @@ class FakeAuthRepository implements AuthRepository {
 
     return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
   }
+
+  @override
+  Future<AuthUser> loginWithGoogle() {
+    throw UnimplementedError();
+  }
 }
