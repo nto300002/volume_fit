@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/auth/application/email_registration_controller.dart';
+import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 
 class AppRoutePaths {
@@ -16,17 +18,19 @@ class AppRoutePaths {
   static const settings = '/settings';
 }
 
-final isAuthenticatedProvider = Provider<bool>((ref) => false);
+final isAuthenticatedProvider = Provider<bool>(
+  (ref) => ref.watch(authSessionProvider),
+);
 
 final initialLocationProvider = Provider<String>((ref) => AppRoutePaths.home);
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final isAuthenticated = ref.watch(isAuthenticatedProvider);
   final initialLocation = ref.watch(initialLocationProvider);
 
   return GoRouter(
     initialLocation: initialLocation,
     redirect: (context, state) {
+      final isAuthenticated = ref.read(isAuthenticatedProvider);
       final isLoginRoute = state.matchedLocation == AppRoutePaths.login;
 
       if (!isAuthenticated && !isLoginRoute) {
@@ -42,7 +46,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: AppRoutePaths.login,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) => const EmailRegistrationScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.home,
@@ -73,15 +77,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-class LoginScreen extends StatelessWidget {
-  const LoginScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('ログイン')));
-  }
-}
 
 class RoutePlaceholderScreen extends StatelessWidget {
   const RoutePlaceholderScreen({super.key, required this.title});
