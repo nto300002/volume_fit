@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/app_router.dart';
+import '../application/email_login_controller.dart';
 import '../application/email_registration_controller.dart';
 
 class EmailRegistrationScreen extends ConsumerStatefulWidget {
@@ -29,7 +30,11 @@ class _EmailRegistrationScreenState
   Widget build(BuildContext context) {
     final registration = ref.watch(emailRegistrationControllerProvider);
     final registrationState = registration.value;
-    final isSubmitting = registration.isLoading;
+    final login = ref.watch(emailLoginControllerProvider);
+    final loginState = login.value;
+    final isSubmitting = registration.isLoading || login.isLoading;
+    final errorMessage =
+        loginState?.errorMessage ?? registrationState?.errorMessage;
 
     return Scaffold(
       appBar: AppBar(title: const Text('ログイン')),
@@ -44,7 +49,7 @@ class _EmailRegistrationScreenState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'アカウント登録',
+                    'ログイン',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
@@ -52,7 +57,7 @@ class _EmailRegistrationScreenState
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'メール確認なしで登録後、初回プロフィール設定へ進みます。',
+                    'メールアドレスとパスワードで続けます。登録後もメール確認は必須にしません。',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
@@ -74,7 +79,7 @@ class _EmailRegistrationScreenState
                     controller: _passwordController,
                     obscureText: true,
                     autofillHints: const [AutofillHints.newPassword],
-                    onSubmitted: (_) => _submit(context),
+                    onSubmitted: (_) => _submitLogin(context),
                     decoration: const InputDecoration(
                       labelText: 'パスワード',
                       helperText: '6文字以上',
@@ -82,9 +87,9 @@ class _EmailRegistrationScreenState
                     ),
                   ),
                   const SizedBox(height: 16),
-                  if (registrationState?.errorMessage != null) ...[
+                  if (errorMessage != null) ...[
                     Text(
-                      registrationState!.errorMessage!,
+                      errorMessage,
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                         fontWeight: FontWeight.w600,
@@ -93,8 +98,21 @@ class _EmailRegistrationScreenState
                     const SizedBox(height: 12),
                   ],
                   FilledButton(
-                    onPressed: isSubmitting ? null : () => _submit(context),
+                    onPressed: isSubmitting ? null : () => _submitLogin(context),
+                    child: isSubmitting && login.isLoading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('メールでログイン'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () => _submitRegistration(context),
                     child: isSubmitting
+                        && registration.isLoading
                         ? const SizedBox.square(
                             dimension: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
@@ -110,7 +128,22 @@ class _EmailRegistrationScreenState
     );
   }
 
-  Future<void> _submit(BuildContext context) async {
+  Future<void> _submitLogin(BuildContext context) async {
+    final succeeded = await ref
+        .read(emailLoginControllerProvider.notifier)
+        .login(
+          email: _emailController.text,
+          password: _passwordController.text,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    _goToProfileWhenAuthenticated(succeeded);
+  }
+
+  Future<void> _submitRegistration(BuildContext context) async {
     final succeeded = await ref
         .read(emailRegistrationControllerProvider.notifier)
         .register(
@@ -118,9 +151,17 @@ class _EmailRegistrationScreenState
           password: _passwordController.text,
         );
 
-    if (succeeded && context.mounted) {
+    if (!mounted) {
+      return;
+    }
+
+    _goToProfileWhenAuthenticated(succeeded);
+  }
+
+  void _goToProfileWhenAuthenticated(bool succeeded) {
+    if (succeeded && mounted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
+        if (mounted) {
           context.go(AppRoutePaths.profile);
         }
       });

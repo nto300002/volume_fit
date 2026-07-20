@@ -10,6 +10,11 @@ abstract interface class AuthRepository {
     required String email,
     required String password,
   });
+
+  Future<AuthUser> loginWithEmailAndPassword({
+    required String email,
+    required String password,
+  });
 }
 
 class AuthUser {
@@ -57,11 +62,37 @@ class FirebaseAuthRepository implements AuthRepository {
         emailVerified: user.emailVerified,
       );
     } on FirebaseAuthException catch (error) {
-      throw AuthFailure(_messageForCode(error.code));
+      throw AuthFailure(_registrationMessageForCode(error.code));
     }
   }
 
-  String _messageForCode(String code) {
+  @override
+  Future<AuthUser> loginWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      final user = credential.user;
+
+      if (user == null) {
+        throw const AuthFailure('メールアドレスまたはパスワードが正しくありません');
+      }
+
+      return AuthUser(
+        uid: user.uid,
+        email: user.email ?? email,
+        emailVerified: user.emailVerified,
+      );
+    } on FirebaseAuthException catch (error) {
+      throw AuthFailure(_loginMessageForCode(error.code));
+    }
+  }
+
+  String _registrationMessageForCode(String code) {
     return switch (code) {
       'invalid-email' => 'メールアドレスの形式を確認してください',
       'weak-password' => 'パスワードは6文字以上で入力してください',
@@ -69,6 +100,18 @@ class FirebaseAuthRepository implements AuthRepository {
       'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
       'network-request-failed' => '通信に失敗しました。接続を確認してください',
       _ => '登録に失敗しました。時間をおいて再度お試しください',
+    };
+  }
+
+  String _loginMessageForCode(String code) {
+    return switch (code) {
+      'invalid-email' => 'メールアドレスの形式を確認してください',
+      'invalid-credential' ||
+      'user-not-found' ||
+      'wrong-password' => 'メールアドレスまたはパスワードが正しくありません',
+      'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
+      'network-request-failed' => '通信に失敗しました。接続を確認してください',
+      _ => 'ログインに失敗しました。時間をおいて再度お試しください',
     };
   }
 }
