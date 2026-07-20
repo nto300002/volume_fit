@@ -1,0 +1,150 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasRequiredDocumentFields(userId) {
+      return request.resource.data.ownerUserId == userId
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && request.resource.data.schemaVersion is int;
+    }
+
+    function immutableFieldsUnchanged() {
+      return request.resource.data.ownerUserId == resource.data.ownerUserId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.schemaVersion == resource.data.schemaVersion;
+    }
+
+    function hasValidRevision() {
+      return !('revision' in request.resource.data)
+        || (request.resource.data.revision is int
+          && request.resource.data.revision >= 1);
+    }
+
+    function isValidKg(value, maximum) {
+      return value == null || (value is number && value >= 0 && value <= maximum);
+    }
+
+    function isValidRatio(value) {
+      return value == null || (value is number && value >= 0 && value <= 1);
+    }
+
+    function isValidRir(value) {
+      return value == null || (value is int && value >= 0 && value <= 10);
+    }
+
+    function isValidWorkoutSet(workoutSet) {
+      return workoutSet is map
+        && (!('reps' in workoutSet)
+          || (workoutSet.reps is int && workoutSet.reps >= 0 && workoutSet.reps <= 999))
+        && (!('rir' in workoutSet)
+          || (workoutSet.rir is int && workoutSet.rir >= 0 && workoutSet.rir <= 10))
+        && (!('externalWeightKg' in workoutSet)
+          || (workoutSet.externalWeightKg is number
+            && workoutSet.externalWeightKg >= 0
+            && workoutSet.externalWeightKg <= 1000))
+        && (!('bodyWeightKg' in workoutSet)
+          || (workoutSet.bodyWeightKg is number
+            && workoutSet.bodyWeightKg >= 0
+            && workoutSet.bodyWeightKg <= 500))
+        && (!('bodyWeightLoadRatio' in workoutSet)
+          || (workoutSet.bodyWeightLoadRatio is number
+            && workoutSet.bodyWeightLoadRatio >= 0
+            && workoutSet.bodyWeightLoadRatio <= 1))
+        && (!('addedWeightKg' in workoutSet)
+          || isValidKg(workoutSet.addedWeightKg, 1000))
+        && (!('assistanceWeightKg' in workoutSet)
+          || isValidKg(workoutSet.assistanceWeightKg, 1000));
+    }
+
+    function hasValidWorkoutSessionValues() {
+      return (!('condition' in request.resource.data)
+          || (request.resource.data.condition is map
+            && (!('bodyWeightKg' in request.resource.data.condition)
+              || isValidKg(request.resource.data.condition.bodyWeightKg, 500))))
+        && (!('totalVolumeKg' in request.resource.data)
+          || isValidKg(request.resource.data.totalVolumeKg, 1000000))
+        && (!('effortAdjustedVolumeKg' in request.resource.data)
+          || isValidKg(request.resource.data.effortAdjustedVolumeKg, 1000000));
+    }
+
+    function hasValidCalculationSettingsValues() {
+      return (!('bodyweightCoefficients' in request.resource.data)
+          || request.resource.data.bodyweightCoefficients is map)
+        && (!('rirMultipliers' in request.resource.data)
+          || request.resource.data.rirMultipliers is map)
+        && (!('isDefault' in request.resource.data)
+          || request.resource.data.isDefault is bool);
+    }
+
+    function isValidUserDocument(userId) {
+      return hasRequiredDocumentFields(userId) && hasValidRevision();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserDocument(userId);
+      allow update: if isOwner(userId)
+        && isValidUserDocument(userId)
+        && immutableFieldsUnchanged();
+      allow delete: if isOwner(userId);
+
+      match /workoutSessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidUserDocument(userId)
+          && hasValidWorkoutSessionValues();
+        allow update: if isOwner(userId)
+          && isValidUserDocument(userId)
+          && immutableFieldsUnchanged()
+          && hasValidWorkoutSessionValues();
+        allow delete: if isOwner(userId);
+
+        match /exerciseLogs/{exerciseLogId}/sets/{setId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && isValidUserDocument(userId)
+            && isValidWorkoutSet(request.resource.data);
+          allow update: if isOwner(userId)
+            && isValidUserDocument(userId)
+            && immutableFieldsUnchanged()
+            && isValidWorkoutSet(request.resource.data);
+          allow delete: if isOwner(userId);
+        }
+      }
+
+      match /calculationSettings/{settingId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && isValidUserDocument(userId)
+          && hasValidCalculationSettingsValues();
+        allow update: if isOwner(userId)
+          && isValidUserDocument(userId)
+          && immutableFieldsUnchanged()
+          && hasValidCalculationSettingsValues();
+        allow delete: if isOwner(userId);
+      }
+
+      match /{document=**} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidUserDocument(userId);
+        allow update: if isOwner(userId)
+          && isValidUserDocument(userId)
+          && immutableFieldsUnchanged();
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
