@@ -205,6 +205,29 @@ void main() {
     expect(find.text('プロフィール'), findsNothing);
   });
 
+  testWidgets('sends password reset email from the login screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_SuccessfulAuthRepository()),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationEmailField')),
+      'user@example.com',
+    );
+    await tester.tap(find.text('パスワード再設定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('パスワード再設定メールを送信しました'), findsOneWidget);
+  });
+
   testWidgets('restores direct route access when authenticated', (
     WidgetTester tester,
   ) async {
@@ -248,6 +271,9 @@ class _SuccessfulAuthRepository implements AuthRepository {
       emailVerified: true,
     );
   }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {}
 }
 
 class _FailingAuthRepository implements AuthRepository {
@@ -273,6 +299,11 @@ class _FailingAuthRepository implements AuthRepository {
 
   @override
   Future<AuthUser> loginWithGoogle() async {
+    throw failure;
+  }
+
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
     throw failure;
   }
 }

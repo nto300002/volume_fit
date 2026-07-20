@@ -17,6 +17,8 @@ abstract interface class AuthRepository {
   });
 
   Future<AuthUser> loginWithGoogle();
+
+  Future<void> sendPasswordResetEmail({required String email});
 }
 
 class AuthUser {
@@ -118,6 +120,15 @@ class FirebaseAuthRepository implements AuthRepository {
     }
   }
 
+  @override
+  Future<void> sendPasswordResetEmail({required String email}) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+    } on FirebaseAuthException catch (error) {
+      throw AuthFailure(_passwordResetMessageForCode(error.code));
+    }
+  }
+
   String _registrationMessageForCode(String code) {
     return switch (code) {
       'invalid-email' => 'メールアドレスの形式を確認してください',
@@ -149,6 +160,15 @@ class FirebaseAuthRepository implements AuthRepository {
       'operation-not-allowed' => 'Googleログインが有効になっていません',
       'network-request-failed' => '通信に失敗しました。接続を確認してください',
       _ => 'Googleログインに失敗しました',
+    };
+  }
+
+  String _passwordResetMessageForCode(String code) {
+    return switch (code) {
+      'invalid-email' => 'メールアドレスの形式を確認してください',
+      'user-not-found' => '登録済みメールアドレスを確認してください',
+      'network-request-failed' => '通信に失敗しました。接続を確認してください',
+      _ => 'パスワード再設定メールの送信に失敗しました',
     };
   }
 }
