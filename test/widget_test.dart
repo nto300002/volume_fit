@@ -73,7 +73,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: VolumeFitApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('ログイン'), findsOneWidget);
+    expect(find.text('ログイン'), findsWidgets);
     expect(find.text('メールで登録'), findsOneWidget);
     expect(find.text('筋トレ記録をAIへつなぐ'), findsNothing);
   });
@@ -105,6 +105,65 @@ void main() {
     expect(find.text('プロフィール'), findsWidgets);
   });
 
+  testWidgets('logs in with email and moves to profile setup', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_SuccessfulAuthRepository()),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationEmailField')),
+      'user@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationPasswordField')),
+      'Password1',
+    );
+    await tester.tap(find.text('メールでログイン'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('プロフィール'), findsWidgets);
+  });
+
+  testWidgets('shows an error when email login fails', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FailingAuthRepository(
+              const AuthFailure('メールアドレスまたはパスワードが正しくありません'),
+            ),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationEmailField')),
+      'user@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationPasswordField')),
+      'wrong-password',
+    );
+    await tester.tap(find.text('メールでログイン'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('メールアドレスまたはパスワードが正しくありません'), findsOneWidget);
+    expect(find.text('プロフィール'), findsNothing);
+  });
+
   testWidgets('restores direct route access when authenticated', (
     WidgetTester tester,
   ) async {
@@ -130,5 +189,35 @@ class _SuccessfulAuthRepository implements AuthRepository {
     required String password,
   }) async {
     return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
+  }
+
+  @override
+  Future<AuthUser> loginWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
+  }
+}
+
+class _FailingAuthRepository implements AuthRepository {
+  const _FailingAuthRepository(this.failure);
+
+  final AuthFailure failure;
+
+  @override
+  Future<AuthUser> registerWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AuthUser> loginWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    throw failure;
   }
 }

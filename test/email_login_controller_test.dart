@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:volume_fit/src/features/auth/application/email_login_controller.dart';
 import 'package:volume_fit/src/features/auth/application/email_registration_controller.dart';
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 
@@ -12,37 +13,40 @@ void main() {
     addTearDown(container.dispose);
 
     final succeeded = await container
-        .read(emailRegistrationControllerProvider.notifier)
-        .register(email: 'invalid-email', password: 'Password1');
+        .read(emailLoginControllerProvider.notifier)
+        .login(email: 'invalid-email', password: 'Password1');
 
     expect(succeeded, isFalse);
-    expect(repository.registerCallCount, 0);
+    expect(repository.loginCallCount, 0);
     expect(
-      container.read(emailRegistrationControllerProvider).value?.errorMessage,
+      container.read(emailLoginControllerProvider).value?.errorMessage,
       'メールアドレスの形式を確認してください',
     );
   });
 
-  test('rejects weak password before calling repository', () async {
-    final repository = FakeAuthRepository();
+  test('shows authentication failure and keeps session unauthenticated', () async {
+    final repository = FakeAuthRepository(
+      failure: const AuthFailure('メールアドレスまたはパスワードが正しくありません'),
+    );
     final container = ProviderContainer(
       overrides: [authRepositoryProvider.overrideWithValue(repository)],
     );
     addTearDown(container.dispose);
 
     final succeeded = await container
-        .read(emailRegistrationControllerProvider.notifier)
-        .register(email: 'user@example.com', password: '12345');
+        .read(emailLoginControllerProvider.notifier)
+        .login(email: 'user@example.com', password: 'wrong-password');
 
     expect(succeeded, isFalse);
-    expect(repository.registerCallCount, 0);
+    expect(repository.loginCallCount, 1);
+    expect(container.read(authSessionProvider), isFalse);
     expect(
-      container.read(emailRegistrationControllerProvider).value?.errorMessage,
-      'パスワードは6文字以上で入力してください',
+      container.read(emailLoginControllerProvider).value?.errorMessage,
+      'メールアドレスまたはパスワードが正しくありません',
     );
   });
 
-  test('marks the session authenticated after registration succeeds', () async {
+  test('marks the session authenticated after login succeeds', () async {
     final repository = FakeAuthRepository();
     final container = ProviderContainer(
       overrides: [authRepositoryProvider.overrideWithValue(repository)],
@@ -50,33 +54,42 @@ void main() {
     addTearDown(container.dispose);
 
     final succeeded = await container
-        .read(emailRegistrationControllerProvider.notifier)
-        .register(email: 'user@example.com', password: 'Password1');
+        .read(emailLoginControllerProvider.notifier)
+        .login(email: 'user@example.com', password: 'Password1');
 
     expect(succeeded, isTrue);
-    expect(repository.registerCallCount, 1);
+    expect(repository.loginCallCount, 1);
     expect(container.read(authSessionProvider), isTrue);
-    expect(container.read(emailRegistrationControllerProvider).value?.isRegistered, isTrue);
+    expect(container.read(emailLoginControllerProvider).value?.isLoggedIn, isTrue);
   });
 }
 
 class FakeAuthRepository implements AuthRepository {
-  int registerCallCount = 0;
+  FakeAuthRepository({this.failure});
+
+  final AuthFailure? failure;
+  int loginCallCount = 0;
 
   @override
   Future<AuthUser> registerWithEmailAndPassword({
     required String email,
     required String password,
-  }) async {
-    registerCallCount += 1;
-    return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
+  }) {
+    throw UnimplementedError();
   }
 
   @override
   Future<AuthUser> loginWithEmailAndPassword({
     required String email,
     required String password,
-  }) {
-    throw UnimplementedError();
+  }) async {
+    loginCallCount += 1;
+
+    final failure = this.failure;
+    if (failure != null) {
+      throw failure;
+    }
+
+    return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
   }
 }
