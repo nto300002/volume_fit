@@ -3,13 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:volume_fit/src/app/app_environment.dart';
 import 'package:volume_fit/src/app/app_providers.dart';
+import 'package:volume_fit/src/app/app_router.dart';
 import 'package:volume_fit/src/app/volume_fit_app.dart';
 
 void main() {
   testWidgets('shows the initial Volume Fit home screen', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const ProviderScope(child: VolumeFitApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [isAuthenticatedProvider.overrideWithValue(true)],
+        child: const VolumeFitApp(),
+      ),
+    );
 
     expect(find.text('Volume Fit'), findsOneWidget);
     expect(find.text('筋トレ記録をAIへつなぐ'), findsOneWidget);
@@ -29,6 +35,7 @@ void main() {
           appEnvironmentProvider.overrideWithValue(
             AppEnvironmentConfig.parse('production'),
           ),
+          isAuthenticatedProvider.overrideWithValue(true),
         ],
         child: const VolumeFitApp(),
       ),
@@ -48,6 +55,7 @@ void main() {
           appEnvironmentProvider.overrideWithValue(
             AppEnvironmentConfig.parse('staging'),
           ),
+          isAuthenticatedProvider.overrideWithValue(true),
         ],
         child: const VolumeFitApp(),
       ),
@@ -55,5 +63,32 @@ void main() {
 
     expect(find.text('STAGING'), findsOneWidget);
     expect(find.text('DEVELOPMENT'), findsNothing);
+  });
+
+  testWidgets('redirects unauthenticated users to login', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: VolumeFitApp()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ログイン'), findsOneWidget);
+    expect(find.text('筋トレ記録をAIへつなぐ'), findsNothing);
+  });
+
+  testWidgets('restores direct route access when authenticated', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          initialLocationProvider.overrideWithValue(AppRoutePaths.history),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('履歴'), findsWidgets);
   });
 }
