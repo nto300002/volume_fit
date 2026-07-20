@@ -132,6 +132,47 @@ void main() {
     expect(find.text('プロフィール'), findsWidgets);
   });
 
+  testWidgets('logs in with Google and moves to profile setup', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_SuccessfulAuthRepository()),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Googleでログイン'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('プロフィール'), findsWidgets);
+  });
+
+  testWidgets('shows an error when Google login fails', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(
+            _FailingAuthRepository(const AuthFailure('Googleログインに失敗しました')),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Googleでログイン'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Googleログインに失敗しました'), findsOneWidget);
+    expect(find.text('プロフィール'), findsNothing);
+  });
+
   testWidgets('shows an error when email login fails', (
     WidgetTester tester,
   ) async {
@@ -198,6 +239,15 @@ class _SuccessfulAuthRepository implements AuthRepository {
   }) async {
     return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
   }
+
+  @override
+  Future<AuthUser> loginWithGoogle() async {
+    return const AuthUser(
+      uid: 'google-uid-1',
+      email: 'user@example.com',
+      emailVerified: true,
+    );
+  }
 }
 
 class _FailingAuthRepository implements AuthRepository {
@@ -218,6 +268,11 @@ class _FailingAuthRepository implements AuthRepository {
     required String email,
     required String password,
   }) async {
+    throw failure;
+  }
+
+  @override
+  Future<AuthUser> loginWithGoogle() async {
     throw failure;
   }
 }
