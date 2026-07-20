@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +6,7 @@ import 'package:volume_fit/src/app/app_environment.dart';
 import 'package:volume_fit/src/app/app_providers.dart';
 import 'package:volume_fit/src/app/app_router.dart';
 import 'package:volume_fit/src/app/volume_fit_app.dart';
+import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 
 void main() {
   testWidgets('shows the initial Volume Fit home screen', (
@@ -72,7 +74,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ログイン'), findsOneWidget);
+    expect(find.text('メールで登録'), findsOneWidget);
     expect(find.text('筋トレ記録をAIへつなぐ'), findsNothing);
+  });
+
+  testWidgets('registers with email and moves to profile setup', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_SuccessfulAuthRepository()),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationEmailField')),
+      'new-user@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationPasswordField')),
+      'Password1',
+    );
+    await tester.tap(find.text('メールで登録'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('プロフィール'), findsWidgets);
   });
 
   testWidgets('restores direct route access when authenticated', (
@@ -91,4 +121,14 @@ void main() {
 
     expect(find.text('履歴'), findsWidgets);
   });
+}
+
+class _SuccessfulAuthRepository implements AuthRepository {
+  @override
+  Future<AuthUser> registerWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    return AuthUser(uid: 'uid-1', email: email, emailVerified: false);
+  }
 }
