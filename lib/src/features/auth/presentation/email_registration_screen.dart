@@ -6,6 +6,7 @@ import '../../../app/app_router.dart';
 import '../application/email_login_controller.dart';
 import '../application/email_registration_controller.dart';
 import '../application/google_login_controller.dart';
+import '../application/password_reset_controller.dart';
 
 class EmailRegistrationScreen extends ConsumerStatefulWidget {
   const EmailRegistrationScreen({super.key});
@@ -35,12 +36,20 @@ class _EmailRegistrationScreenState
     final loginState = login.value;
     final googleLogin = ref.watch(googleLoginControllerProvider);
     final googleLoginState = googleLogin.value;
+    final passwordReset = ref.watch(passwordResetControllerProvider);
+    final passwordResetState = passwordReset.value;
     final isSubmitting =
-        registration.isLoading || login.isLoading || googleLogin.isLoading;
+        registration.isLoading
+        || login.isLoading
+        || googleLogin.isLoading
+        || passwordReset.isLoading;
     final errorMessage =
-        googleLoginState?.errorMessage
+        passwordResetState?.errorMessage
+        ?? googleLoginState?.errorMessage
         ?? loginState?.errorMessage
         ?? registrationState?.errorMessage;
+    final successMessage =
+        passwordResetState?.successMessage;
 
     return Scaffold(
       appBar: AppBar(title: const Text('ログイン')),
@@ -103,6 +112,16 @@ class _EmailRegistrationScreenState
                     ),
                     const SizedBox(height: 12),
                   ],
+                  if (successMessage != null) ...[
+                    Text(
+                      successMessage,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   OutlinedButton(
                     onPressed: isSubmitting
                         ? null
@@ -136,6 +155,18 @@ class _EmailRegistrationScreenState
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Text('メールで登録'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () => _submitPasswordReset(context),
+                    child: passwordReset.isLoading
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('パスワード再設定'),
                   ),
                 ],
               ),
@@ -186,6 +217,12 @@ class _EmailRegistrationScreenState
     }
 
     _goToProfileWhenAuthenticated(succeeded);
+  }
+
+  Future<void> _submitPasswordReset(BuildContext context) async {
+    await ref
+        .read(passwordResetControllerProvider.notifier)
+        .send(email: _emailController.text);
   }
 
   void _goToProfileWhenAuthenticated(bool succeeded) {
