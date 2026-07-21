@@ -101,4 +101,9 @@ class FakeAuthRepository implements AuthRepository {
       throw failure;
     }
   }
+
+  @override
+  Future<void> signOut() {
+    throw UnimplementedError();
+  }
 }
