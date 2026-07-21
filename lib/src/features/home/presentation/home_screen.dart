@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../app/app_router.dart';
 import '../../../app/app_providers.dart';
+import '../../auth/application/logout_controller.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -10,9 +13,29 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final environment = ref.watch(appEnvironmentProvider);
+    final logout = ref.watch(logoutControllerProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Volume Fit'), centerTitle: false),
+      appBar: AppBar(
+        title: const Text('Volume Fit'),
+        centerTitle: false,
+        actions: [
+          TextButton(
+            onPressed: logout.isLoading
+                ? null
+                : () async {
+                    final succeeded = await ref
+                        .read(logoutControllerProvider.notifier)
+                        .logout();
+
+                    if (succeeded && context.mounted) {
+                      context.go(AppRoutePaths.login);
+                    }
+                  },
+            child: const Text('ログアウト'),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/email_registration_controller.dart';
+import '../features/auth/application/logout_controller.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 
@@ -78,15 +79,35 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class RoutePlaceholderScreen extends StatelessWidget {
+class RoutePlaceholderScreen extends ConsumerWidget {
   const RoutePlaceholderScreen({super.key, required this.title});
 
   final String title;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final logout = ref.watch(logoutControllerProvider);
+
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(
+        title: Text(title),
+        actions: [
+          TextButton(
+            onPressed: logout.isLoading
+                ? null
+                : () async {
+                    final succeeded = await ref
+                        .read(logoutControllerProvider.notifier)
+                        .logout();
+
+                    if (succeeded && context.mounted) {
+                      context.go(AppRoutePaths.login);
+                    }
+                  },
+            child: const Text('ログアウト'),
+          ),
+        ],
+      ),
       body: Center(child: Text(title)),
     );
   }

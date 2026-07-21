@@ -228,6 +228,39 @@ void main() {
     expect(find.text('パスワード再設定メールを送信しました'), findsOneWidget);
   });
 
+  testWidgets('logs out and returns to the login screen', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(_SuccessfulAuthRepository()),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationEmailField')),
+      'user@example.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('emailRegistrationPasswordField')),
+      'Password1',
+    );
+    await tester.tap(find.text('メールでログイン'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('プロフィール'), findsWidgets);
+
+    await tester.tap(find.text('ログアウト'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('メールでログイン'), findsOneWidget);
+    expect(find.text('筋トレ記録をAIへつなぐ'), findsNothing);
+  });
+
   testWidgets('restores direct route access when authenticated', (
     WidgetTester tester,
   ) async {
@@ -274,6 +307,9 @@ class _SuccessfulAuthRepository implements AuthRepository {
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {}
+
+  @override
+  Future<void> signOut() async {}
 }
 
 class _FailingAuthRepository implements AuthRepository {
@@ -304,6 +340,11 @@ class _FailingAuthRepository implements AuthRepository {
 
   @override
   Future<void> sendPasswordResetEmail({required String email}) async {
+    throw failure;
+  }
+
+  @override
+  Future<void> signOut() async {
     throw failure;
   }
 }

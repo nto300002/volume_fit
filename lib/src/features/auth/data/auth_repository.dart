@@ -19,6 +19,8 @@ abstract interface class AuthRepository {
   Future<AuthUser> loginWithGoogle();
 
   Future<void> sendPasswordResetEmail({required String email});
+
+  Future<void> signOut();
 }
 
 class AuthUser {
@@ -126,6 +128,15 @@ class FirebaseAuthRepository implements AuthRepository {
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (error) {
       throw AuthFailure(_passwordResetMessageForCode(error.code));
+    }
+  }
+
+  @override
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } on FirebaseAuthException {
+      throw const AuthFailure('ログアウトに失敗しました');
     }
   }
 

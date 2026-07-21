@@ -29,6 +29,10 @@ class AuthSessionController extends Notifier<bool> {
   void markAuthenticated() {
     state = true;
   }
+
+  void markUnauthenticated() {
+    state = false;
+  }
 }
 
 class EmailRegistrationController
