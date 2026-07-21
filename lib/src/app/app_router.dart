@@ -7,6 +7,7 @@ import '../features/auth/application/logout_controller.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/profile/presentation/initial_profile_screen.dart';
+import '../features/workout/presentation/workout_set_input_screen.dart';
 
 class AppRoutePaths {
   const AppRoutePaths._();
@@ -60,8 +61,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutePaths.workout,
-        builder: (context, state) =>
-            const RoutePlaceholderScreen(title: 'トレーニング'),
+        builder: (context, state) => const WorkoutSetInputScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.history,
