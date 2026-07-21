@@ -7,6 +7,7 @@ import 'package:volume_fit/src/app/app_providers.dart';
 import 'package:volume_fit/src/app/app_router.dart';
 import 'package:volume_fit/src/app/volume_fit_app.dart';
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
+import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
 
 void main() {
   testWidgets('shows the initial Volume Fit home screen', (
@@ -277,6 +278,39 @@ void main() {
 
     expect(find.text('履歴'), findsWidgets);
   });
+
+  testWidgets('saves initial profile and moves to home', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          initialLocationProvider.overrideWithValue(AppRoutePaths.profile),
+          profileRepositoryProvider.overrideWithValue(
+            _SuccessfulProfileRepository(),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('初回プロフィール設定'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const Key('profileBodyWeightField')),
+      '66.8',
+    );
+    await tester.tap(find.byKey(const Key('profileGoalDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('筋肥大').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存する'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('筋トレ記録をAIへつなぐ'), findsOneWidget);
+  });
 }
 
 class _SuccessfulAuthRepository implements AuthRepository {
@@ -347,4 +381,9 @@ class _FailingAuthRepository implements AuthRepository {
   Future<void> signOut() async {
     throw failure;
   }
+}
+
+class _SuccessfulProfileRepository implements ProfileRepository {
+  @override
+  Future<void> saveInitialProfile(InitialProfileDraft draft) async {}
 }
