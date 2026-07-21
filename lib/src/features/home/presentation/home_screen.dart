@@ -85,7 +85,10 @@ class HomeScreen extends ConsumerWidget {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
-                FilledButton(onPressed: () {}, child: const Text('トレーニングを開始')),
+                FilledButton(
+                  onPressed: () => context.go(AppRoutePaths.workout),
+                  child: const Text('トレーニングを開始'),
+                ),
                 const SizedBox(height: 12),
                 OutlinedButton(
                   onPressed: () {},
