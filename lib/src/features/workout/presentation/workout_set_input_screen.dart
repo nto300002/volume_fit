@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_router.dart';
 import '../../auth/application/logout_controller.dart';
 import '../application/workout_set_input_controller.dart';
+import '../data/calculation_settings.dart';
+import '../domain/bodyweight_load_calculator.dart';
 
 class WorkoutSetInputScreen extends ConsumerStatefulWidget {
   const WorkoutSetInputScreen({super.key});
@@ -16,12 +18,18 @@ class WorkoutSetInputScreen extends ConsumerStatefulWidget {
 
 class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   final _repsController = TextEditingController();
+  final _bodyWeightController = TextEditingController();
+  final _addedWeightController = TextEditingController();
+  final _assistanceWeightController = TextEditingController();
   String? _exerciseId;
   int? _rir;
 
   @override
   void dispose() {
     _repsController.dispose();
+    _bodyWeightController.dispose();
+    _addedWeightController.dispose();
+    _assistanceWeightController.dispose();
     super.dispose();
   }
 
@@ -31,6 +39,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final inputState = workoutInput.value;
     final logout = ref.watch(logoutControllerProvider);
     final isSaving = workoutInput.isLoading;
+    final estimatedLoad = _estimatedLoad();
 
     return Scaffold(
       appBar: AppBar(
@@ -94,6 +103,65 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  key: const Key('workoutBodyWeightField'),
+                  controller: _bodyWeightController,
+                  enabled: !isSaving,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: '体重 kg',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('workoutAddedWeightField'),
+                  controller: _addedWeightController,
+                  enabled: !isSaving,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: '追加重量 kg',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('workoutAssistanceWeightField'),
+                  controller: _assistanceWeightController,
+                  enabled: !isSaving,
+                  keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    labelText: '補助重量 kg',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (estimatedLoad != null) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            '推定負荷（概算）',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text('${estimatedLoad.toStringAsFixed(1)} kg'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   key: const Key('workoutRirDropdown'),
                   initialValue: _rir,
@@ -155,5 +223,40 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
           repsText: _repsController.text,
           rir: _rir,
         );
+  }
+
+  double? _estimatedLoad() {
+    final exerciseId = _exerciseId;
+    if (exerciseId == null) {
+      return null;
+    }
+
+    final bodyWeight = double.tryParse(_bodyWeightController.text.trim());
+    if (bodyWeight == null) {
+      return null;
+    }
+
+    final ratio = ref
+        .read(calculationSettingsProvider)
+        .bodyWeightLoadRatioFor(exerciseId);
+    if (ratio == null) {
+      return null;
+    }
+
+    final addedWeight =
+        double.tryParse(_addedWeightController.text.trim()) ?? 0;
+    final assistanceWeight =
+        double.tryParse(_assistanceWeightController.text.trim()) ?? 0;
+
+    try {
+      return const BodyweightLoadCalculator().estimatedLoadKg(
+        bodyWeightKg: bodyWeight,
+        bodyWeightLoadRatio: ratio,
+        addedWeightKg: addedWeight,
+        assistanceWeightKg: assistanceWeight,
+      );
+    } on ArgumentError {
+      return null;
+    }
   }
 }
