@@ -6,6 +6,7 @@ import '../features/auth/application/email_registration_controller.dart';
 import '../features/auth/application/logout_controller.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
+import '../features/profile/presentation/initial_profile_screen.dart';
 
 class AppRoutePaths {
   const AppRoutePaths._();
@@ -55,8 +56,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutePaths.profile,
-        builder: (context, state) =>
-            const RoutePlaceholderScreen(title: 'プロフィール'),
+        builder: (context, state) => const InitialProfileScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.workout,
