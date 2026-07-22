@@ -8,6 +8,7 @@ import 'package:volume_fit/src/app/app_router.dart';
 import 'package:volume_fit/src/app/volume_fit_app.dart';
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
+import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
 import 'package:volume_fit/src/features/workout/data/workout_set_input_repository.dart';
 
 void main() {
@@ -347,6 +348,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('入力を保存しました'), findsOneWidget);
+  });
+
+  testWidgets('shows approximate bodyweight load using calculation settings', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          calculationSettingsProvider.overrideWithValue(
+            const CalculationSettings(bodyWeightLoadRatios: {'push_up': 0.72}),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutExerciseDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('腕立て伏せ').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workoutBodyWeightField')),
+      '80',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('推定負荷（概算）'), findsOneWidget);
+    expect(find.text('57.6 kg'), findsOneWidget);
   });
 }
 
