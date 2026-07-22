@@ -415,6 +415,43 @@ void main() {
     expect(find.text('セットボリューム（概算）'), findsOneWidget);
     expect(find.text('691.2 kg'), findsOneWidget);
   });
+
+  testWidgets('shows RIR adjusted volume as a comparison rule', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          calculationSettingsProvider.overrideWithValue(
+            const CalculationSettings(bodyWeightLoadRatios: {'push_up': 0.72}),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutExerciseDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('腕立て伏せ').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workoutBodyWeightField')),
+      '80',
+    );
+    await tester.enterText(find.byKey(const Key('workoutRepsField')), '12');
+    await tester.tap(find.byKey(const Key('workoutRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 2').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('RIR補正ボリューム（比較用）'), findsOneWidget);
+    expect(find.text('656.6 kg'), findsOneWidget);
+    expect(find.text('独自比較ルールによる概算値です'), findsOneWidget);
+  });
 }
 
 class _SuccessfulAuthRepository implements AuthRepository {
