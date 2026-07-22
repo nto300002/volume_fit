@@ -7,6 +7,7 @@ import '../../auth/application/logout_controller.dart';
 import '../application/workout_set_input_controller.dart';
 import '../data/calculation_settings.dart';
 import '../domain/bodyweight_load_calculator.dart';
+import '../domain/rir_adjusted_volume_calculator.dart';
 import '../domain/set_volume_calculator.dart';
 
 class WorkoutSetInputScreen extends ConsumerStatefulWidget {
@@ -42,6 +43,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final isSaving = workoutInput.isLoading;
     final estimatedLoad = _estimatedLoad();
     final setVolume = _setVolume(estimatedLoad);
+    final rirAdjustedVolume = _rirAdjustedVolume(setVolume);
 
     return Scaffold(
       appBar: AppBar(
@@ -186,6 +188,40 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
+                if (rirAdjustedVolume != null) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'RIR補正ボリューム（比較用）',
+                                style: TextStyle(fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                '${rirAdjustedVolume.toStringAsFixed(1)} kg',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '独自比較ルールによる概算値です',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                   key: const Key('workoutRirDropdown'),
@@ -299,6 +335,22 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
       return const SetVolumeCalculator().setVolumeKg(
         estimatedLoadKg: estimatedLoad,
         reps: reps,
+      );
+    } on ArgumentError {
+      return null;
+    }
+  }
+
+  double? _rirAdjustedVolume(double? setVolume) {
+    if (setVolume == null) {
+      return null;
+    }
+
+    try {
+      return const RirAdjustedVolumeCalculator().effortAdjustedVolume(
+        setVolumeKg: setVolume,
+        rir: _rir,
+        settings: ref.read(calculationSettingsProvider),
       );
     } on ArgumentError {
       return null;
