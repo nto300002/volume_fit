@@ -381,6 +381,40 @@ void main() {
     expect(find.text('推定負荷（概算）'), findsOneWidget);
     expect(find.text('57.6 kg'), findsOneWidget);
   });
+
+  testWidgets('shows approximate set volume when reps and load are entered', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          calculationSettingsProvider.overrideWithValue(
+            const CalculationSettings(bodyWeightLoadRatios: {'push_up': 0.72}),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutExerciseDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('腕立て伏せ').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workoutBodyWeightField')),
+      '80',
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('workoutRepsField')), '12');
+    await tester.pumpAndSettle();
+
+    expect(find.text('セットボリューム（概算）'), findsOneWidget);
+    expect(find.text('691.2 kg'), findsOneWidget);
+  });
 }
 
 class _SuccessfulAuthRepository implements AuthRepository {

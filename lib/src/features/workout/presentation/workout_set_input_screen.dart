@@ -7,6 +7,7 @@ import '../../auth/application/logout_controller.dart';
 import '../application/workout_set_input_controller.dart';
 import '../data/calculation_settings.dart';
 import '../domain/bodyweight_load_calculator.dart';
+import '../domain/set_volume_calculator.dart';
 
 class WorkoutSetInputScreen extends ConsumerStatefulWidget {
   const WorkoutSetInputScreen({super.key});
@@ -40,6 +41,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final logout = ref.watch(logoutControllerProvider);
     final isSaving = workoutInput.isLoading;
     final estimatedLoad = _estimatedLoad();
+    final setVolume = _setVolume(estimatedLoad);
 
     return Scaffold(
       appBar: AppBar(
@@ -97,6 +99,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   controller: _repsController,
                   enabled: !isSaving,
                   keyboardType: TextInputType.number,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: '回数',
                     border: OutlineInputBorder(),
@@ -155,6 +158,28 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                             style: TextStyle(fontWeight: FontWeight.w600),
                           ),
                           Text('${estimatedLoad.toStringAsFixed(1)} kg'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (setVolume != null) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'セットボリューム（概算）',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text('${setVolume.toStringAsFixed(1)} kg'),
                         ],
                       ),
                     ),
@@ -254,6 +279,26 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
         bodyWeightLoadRatio: ratio,
         addedWeightKg: addedWeight,
         assistanceWeightKg: assistanceWeight,
+      );
+    } on ArgumentError {
+      return null;
+    }
+  }
+
+  double? _setVolume(double? estimatedLoad) {
+    if (estimatedLoad == null) {
+      return null;
+    }
+
+    final reps = int.tryParse(_repsController.text.trim());
+    if (reps == null) {
+      return null;
+    }
+
+    try {
+      return const SetVolumeCalculator().setVolumeKg(
+        estimatedLoadKg: estimatedLoad,
+        reps: reps,
       );
     } on ArgumentError {
       return null;
