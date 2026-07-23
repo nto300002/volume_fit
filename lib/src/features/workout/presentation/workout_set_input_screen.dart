@@ -41,7 +41,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final workoutInput = ref.watch(workoutSetInputControllerProvider);
     final inputState = workoutInput.value;
     final logout = ref.watch(logoutControllerProvider);
-    final isSaving = workoutInput.isLoading;
+    final isSaving = inputState?.saveStatus == WorkoutSetSaveStatus.saving;
     final estimatedLoad = _estimatedLoad();
     final setVolume = _setVolume(estimatedLoad);
     final rirAdjustedVolume = _rirAdjustedVolume(setVolume);
@@ -263,22 +263,43 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                if (inputState?.errorMessage != null) ...[
+                if (inputState?.statusMessage != null) ...[
                   Text(
-                    inputState!.errorMessage!,
+                    inputState!.statusMessage!,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                      color:
+                          inputState.saveStatus == WorkoutSetSaveStatus.failed
+                          ? Theme.of(context).colorScheme.error
+                          : Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                   const SizedBox(height: 12),
                 ],
-                if (inputState?.successMessage != null) ...[
-                  Text(
-                    inputState!.successMessage!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w600,
+                if (inputState?.saveStatus == WorkoutSetSaveStatus.failed) ...[
+                  OutlinedButton(
+                    onPressed: isSaving
+                        ? null
+                        : () => ref
+                              .read(workoutSetInputControllerProvider.notifier)
+                              .retrySave(),
+                    child: const Text('再試行'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (isSaving) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        '保存中',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
