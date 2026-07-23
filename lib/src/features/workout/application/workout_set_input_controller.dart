@@ -7,24 +7,45 @@ final workoutSetInputControllerProvider =
       WorkoutSetInputController.new,
     );
 
+enum WorkoutSetSaveStatus {
+  idle,
+  saving,
+  pending,
+  offlinePending,
+  saved,
+  failed,
+}
+
 class WorkoutSetInputState {
   const WorkoutSetInputState({
     this.draft = const WorkoutSetInputDraft(),
-    this.isSaved = false,
-    this.successMessage,
+    this.saveStatus = WorkoutSetSaveStatus.idle,
     this.errorMessage,
   });
 
   final WorkoutSetInputDraft draft;
-  final bool isSaved;
-  final String? successMessage;
+  final WorkoutSetSaveStatus saveStatus;
   final String? errorMessage;
+
+  bool get isSaved => saveStatus == WorkoutSetSaveStatus.saved;
+
+  String? get statusMessage {
+    return switch (saveStatus) {
+      WorkoutSetSaveStatus.saving => '保存中です',
+      WorkoutSetSaveStatus.pending => '同期待ちです',
+      WorkoutSetSaveStatus.offlinePending => 'オフライン保留中です',
+      WorkoutSetSaveStatus.saved => '保存済みです',
+      WorkoutSetSaveStatus.failed => errorMessage,
+      WorkoutSetSaveStatus.idle => null,
+    };
+  }
 }
 
 class WorkoutSetInputDraft {
   const WorkoutSetInputDraft({
     this.exerciseId,
     this.bodyWeightText = '',
+    this.bodyWeightLoadRatio,
     this.addedWeightText = '',
     this.assistanceWeightText = '',
     this.repsText = '',
@@ -33,6 +54,7 @@ class WorkoutSetInputDraft {
 
   final String? exerciseId;
   final String bodyWeightText;
+  final double? bodyWeightLoadRatio;
   final String addedWeightText;
   final String assistanceWeightText;
   final String repsText;
@@ -55,6 +77,7 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     final draft = WorkoutSetInputDraft(
       exerciseId: exerciseId,
       bodyWeightText: bodyWeightText ?? '',
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
       addedWeightText: addedWeightText ?? '',
       assistanceWeightText: assistanceWeightText ?? '',
       repsText: repsText,
@@ -133,10 +156,15 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       return false;
     }
 
-    state = const AsyncLoading();
+    state = AsyncData(
+      WorkoutSetInputState(
+        draft: draft,
+        saveStatus: WorkoutSetSaveStatus.saving,
+      ),
+    );
 
     try {
-      await ref
+      final result = await ref
           .read(workoutSetInputRepositoryProvider)
           .saveDraftSet(
             WorkoutSetDraft(
@@ -150,19 +178,45 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
             ),
           );
       state = AsyncData(
-        WorkoutSetInputState(
-          draft: draft,
-          isSaved: true,
-          successMessage: '入力を保存しました',
-        ),
+        WorkoutSetInputState(draft: draft, saveStatus: _saveStatusFor(result)),
       );
       return true;
     } on WorkoutSetInputFailure catch (error) {
       state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: error.message),
+        WorkoutSetInputState(
+          draft: draft,
+          saveStatus: WorkoutSetSaveStatus.failed,
+          errorMessage: error.message,
+        ),
       );
       return false;
     }
+  }
+
+  Future<bool> retrySave() async {
+    final draft = state.value?.draft;
+    if (draft == null) {
+      return false;
+    }
+
+    return saveSet(
+      exerciseId: draft.exerciseId,
+      bodyWeightText: draft.bodyWeightText,
+      bodyWeightLoadRatio: draft.bodyWeightLoadRatio,
+      addedWeightText: draft.addedWeightText,
+      assistanceWeightText: draft.assistanceWeightText,
+      repsText: draft.repsText,
+      rir: draft.rir,
+    );
+  }
+
+  WorkoutSetSaveStatus _saveStatusFor(WorkoutSetSaveResult result) {
+    return switch (result) {
+      WorkoutSetSaveResult.saved => WorkoutSetSaveStatus.saved,
+      WorkoutSetSaveResult.pending => WorkoutSetSaveStatus.pending,
+      WorkoutSetSaveResult.offlinePending =>
+        WorkoutSetSaveStatus.offlinePending,
+    };
   }
 
   double? _optionalWeight(String? value) {

@@ -21,8 +21,10 @@ final workoutSetInputRepositoryProvider = Provider<WorkoutSetInputRepository>(
 );
 
 abstract interface class WorkoutSetInputRepository {
-  Future<void> saveDraftSet(WorkoutSetDraft draft);
+  Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft);
 }
+
+enum WorkoutSetSaveResult { saved, pending, offlinePending }
 
 abstract interface class WorkoutSessionWriter {
   Future<void> addSession({
@@ -69,7 +71,7 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
   final Clock clock;
 
   @override
-  Future<void> saveDraftSet(WorkoutSetDraft draft) async {
+  Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft) async {
     final ownerUserId = currentAuthUserId;
     if (ownerUserId == null) {
       throw const WorkoutSetInputFailure('ログイン状態を確認してください');
@@ -81,8 +83,14 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
         ownerUserId: ownerUserId,
         data: _sessionData(ownerUserId: ownerUserId, draft: draft, now: now),
       );
+      return WorkoutSetSaveResult.saved;
     } on WorkoutSetInputFailure {
       rethrow;
+    } on FirebaseException catch (error) {
+      if (error.code == 'unavailable') {
+        return WorkoutSetSaveResult.offlinePending;
+      }
+      throw const WorkoutSetInputFailure('保存に失敗しました');
     } on Exception {
       throw const WorkoutSetInputFailure('保存に失敗しました');
     }
