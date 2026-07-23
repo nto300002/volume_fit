@@ -22,9 +22,19 @@ class WorkoutSetInputState {
 }
 
 class WorkoutSetInputDraft {
-  const WorkoutSetInputDraft({this.exerciseId, this.repsText = '', this.rir});
+  const WorkoutSetInputDraft({
+    this.exerciseId,
+    this.bodyWeightText = '',
+    this.addedWeightText = '',
+    this.assistanceWeightText = '',
+    this.repsText = '',
+    this.rir,
+  });
 
   final String? exerciseId;
+  final String bodyWeightText;
+  final String addedWeightText;
+  final String assistanceWeightText;
   final String repsText;
   final int? rir;
 }
@@ -35,11 +45,18 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
 
   Future<bool> saveSet({
     String? exerciseId,
+    String? bodyWeightText,
+    double? bodyWeightLoadRatio,
+    String? addedWeightText,
+    String? assistanceWeightText,
     required String repsText,
     int? rir,
   }) async {
     final draft = WorkoutSetInputDraft(
       exerciseId: exerciseId,
+      bodyWeightText: bodyWeightText ?? '',
+      addedWeightText: addedWeightText ?? '',
+      assistanceWeightText: assistanceWeightText ?? '',
       repsText: repsText,
       rir: rir,
     );
@@ -56,6 +73,47 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     if (reps == null || reps < 1) {
       state = AsyncData(
         WorkoutSetInputState(draft: draft, errorMessage: '回数は1回以上で入力してください'),
+      );
+      return false;
+    }
+
+    final bodyWeight = double.tryParse((bodyWeightText ?? '').trim());
+    if (bodyWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重を入力してください'),
+      );
+      return false;
+    }
+
+    if (bodyWeight <= 0 || bodyWeight > 500) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重は0より大きい値で入力してください'),
+      );
+      return false;
+    }
+
+    final selectedBodyWeightLoadRatio = bodyWeightLoadRatio;
+    if (selectedBodyWeightLoadRatio == null ||
+        selectedBodyWeightLoadRatio < 0 ||
+        selectedBodyWeightLoadRatio > 1) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '自重負荷係数を確認してください'),
+      );
+      return false;
+    }
+
+    final addedWeight = _optionalWeight(addedWeightText);
+    if (addedWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '追加重量は0以上で入力してください'),
+      );
+      return false;
+    }
+
+    final assistanceWeight = _optionalWeight(assistanceWeightText);
+    if (assistanceWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '補助重量は0以上で入力してください'),
       );
       return false;
     }
@@ -83,6 +141,10 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
           .saveDraftSet(
             WorkoutSetDraft(
               exerciseId: selectedExerciseId,
+              bodyWeightKg: bodyWeight,
+              bodyWeightLoadRatio: selectedBodyWeightLoadRatio,
+              addedWeightKg: addedWeight,
+              assistanceWeightKg: assistanceWeight,
               reps: reps,
               rir: selectedRir,
             ),
@@ -101,5 +163,19 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       );
       return false;
     }
+  }
+
+  double? _optionalWeight(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 0;
+    }
+
+    final parsed = double.tryParse(trimmed);
+    if (parsed == null || parsed < 0) {
+      return null;
+    }
+
+    return parsed;
   }
 }

@@ -339,6 +339,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('腕立て伏せ').last);
     await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workoutBodyWeightField')),
+      '80',
+    );
     await tester.enterText(find.byKey(const Key('workoutRepsField')), '12');
     await tester.tap(find.byKey(const Key('workoutRirDropdown')));
     await tester.pumpAndSettle();

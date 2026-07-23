@@ -57,11 +57,19 @@ void main() {
 
     final succeeded = await container
         .read(workoutSetInputControllerProvider.notifier)
-        .saveSet(exerciseId: 'push_up', repsText: '12', rir: 2);
+        .saveSet(
+          exerciseId: 'push_up',
+          bodyWeightText: '80',
+          bodyWeightLoadRatio: 0.72,
+          repsText: '12',
+          rir: 2,
+        );
 
     expect(succeeded, isTrue);
     expect(repository.saveCallCount, 1);
     expect(repository.lastDraft?.exerciseId, 'push_up');
+    expect(repository.lastDraft?.bodyWeightKg, 80);
+    expect(repository.lastDraft?.bodyWeightLoadRatio, 0.72);
     expect(repository.lastDraft?.reps, 12);
     expect(repository.lastDraft?.rir, 2);
     expect(
@@ -83,13 +91,20 @@ void main() {
 
     final succeeded = await container
         .read(workoutSetInputControllerProvider.notifier)
-        .saveSet(exerciseId: 'push_up', repsText: '15', rir: 1);
+        .saveSet(
+          exerciseId: 'push_up',
+          bodyWeightText: '80',
+          bodyWeightLoadRatio: 0.72,
+          repsText: '15',
+          rir: 1,
+        );
 
     final state = container.read(workoutSetInputControllerProvider).value;
     expect(succeeded, isFalse);
     expect(repository.saveCallCount, 1);
     expect(state?.errorMessage, '保存に失敗しました');
     expect(state?.draft.exerciseId, 'push_up');
+    expect(state?.draft.bodyWeightText, '80');
     expect(state?.draft.repsText, '15');
     expect(state?.draft.rir, 1);
   });
