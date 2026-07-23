@@ -301,10 +301,19 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   }
 
   Future<void> _save() async {
+    final exerciseId = _exerciseId;
     await ref
         .read(workoutSetInputControllerProvider.notifier)
         .saveSet(
-          exerciseId: _exerciseId,
+          exerciseId: exerciseId,
+          bodyWeightText: _bodyWeightController.text,
+          bodyWeightLoadRatio: exerciseId == null
+              ? null
+              : ref
+                    .read(calculationSettingsProvider)
+                    .bodyWeightLoadRatioFor(exerciseId),
+          addedWeightText: _addedWeightController.text,
+          assistanceWeightText: _assistanceWeightController.text,
           repsText: _repsController.text,
           rir: _rir,
         );
