@@ -92,3 +92,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  fonts:
+    - family: HiraginoKakuGothic
+      fonts:
+        - asset: assets/fonts/HiraginoKakuGothic-W3.ttc
+          weight: 400
+        - asset: assets/fonts/HiraginoKakuGothic-W6.ttc
+          weight: 600
+        - asset: assets/fonts/HiraginoKakuGothic-W6.ttc
+          weight: 700
