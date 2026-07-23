@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/email_registration_controller.dart';
 import '../features/auth/application/logout_controller.dart';
+import '../features/ai_export/presentation/ai_export_screen.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/profile/presentation/initial_profile_screen.dart';
@@ -69,7 +70,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutePaths.ai,
-        builder: (context, state) => const RoutePlaceholderScreen(title: 'AI'),
+        builder: (context, state) => const AiExportScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.settings,

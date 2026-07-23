@@ -335,6 +335,48 @@ void main() {
     expect(find.text('保存済みです'), findsOneWidget);
   });
 
+  testWidgets('generates AI markdown preview from one push-up set', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [isAuthenticatedProvider.overrideWithValue(true)],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AI出力を作成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI出力'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('aiBodyWeightField')), '80');
+    await tester.enterText(find.byKey(const Key('aiRepsField')), '12');
+    await tester.tap(find.byKey(const Key('aiRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('aiGenerateMarkdownButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Markdownプレビュー'), findsOneWidget);
+    expect(find.textContaining('記録上確認できる事実と推定を分けてください。'), findsOneWidget);
+    expect(find.textContaining('アプリの計算値は比較用の概算です。'), findsOneWidget);
+    expect(
+      find.textContaining('最後にNotionへ保存しやすいMarkdownを出力してください。'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('| 1 | 12 | 2 | 80.0 kg | 0.72 |'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('| 1 | 57.6 kg | 691.2 kg | 656.6 kg | ハードセット |'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('shows pending save status', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(

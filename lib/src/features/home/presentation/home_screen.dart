@@ -91,6 +91,14 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
+                  onPressed: () => context.go(AppRoutePaths.ai),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
+                  child: const Text('AI出力を作成'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
                   onPressed: () {},
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colorScheme.primary,
