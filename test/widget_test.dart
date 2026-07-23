@@ -344,6 +344,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('RIR 2').last);
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('保存'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
@@ -451,6 +453,37 @@ void main() {
     expect(find.text('RIR補正ボリューム（比較用）'), findsOneWidget);
     expect(find.text('656.6 kg'), findsOneWidget);
     expect(find.text('独自比較ルールによる概算値です'), findsOneWidget);
+  });
+
+  testWidgets('shows hard set judgment when RIR is selected', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          calculationSettingsProvider.overrideWithValue(
+            const CalculationSettings(bodyWeightLoadRatios: {'push_up': 0.72}),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutExerciseDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('腕立て伏せ').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 4').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('ハードセット判定'), findsOneWidget);
+    expect(find.text('ハードセット'), findsOneWidget);
   });
 }
 

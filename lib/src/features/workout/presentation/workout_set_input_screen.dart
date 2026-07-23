@@ -7,6 +7,7 @@ import '../../auth/application/logout_controller.dart';
 import '../application/workout_set_input_controller.dart';
 import '../data/calculation_settings.dart';
 import '../domain/bodyweight_load_calculator.dart';
+import '../domain/hard_set_judge.dart';
 import '../domain/rir_adjusted_volume_calculator.dart';
 import '../domain/set_volume_calculator.dart';
 
@@ -44,6 +45,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final estimatedLoad = _estimatedLoad();
     final setVolume = _setVolume(estimatedLoad);
     final rirAdjustedVolume = _rirAdjustedVolume(setVolume);
+    final hardSet = _hardSetJudgement();
 
     return Scaffold(
       appBar: AppBar(
@@ -238,6 +240,28 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                       ? null
                       : (value) => setState(() => _rir = value),
                 ),
+                if (hardSet != null) ...[
+                  const SizedBox(height: 12),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'ハードセット判定',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          Text(hardSet ? 'ハードセット' : '通常セット'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 if (inputState?.errorMessage != null) ...[
                   Text(
@@ -352,6 +376,14 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
         rir: _rir,
         settings: ref.read(calculationSettingsProvider),
       );
+    } on ArgumentError {
+      return null;
+    }
+  }
+
+  bool? _hardSetJudgement() {
+    try {
+      return const HardSetJudge().isHardSet(_rir);
     } on ArgumentError {
       return null;
     }
