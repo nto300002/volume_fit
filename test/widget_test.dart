@@ -6,6 +6,7 @@ import 'package:volume_fit/src/app/app_environment.dart';
 import 'package:volume_fit/src/app/app_providers.dart';
 import 'package:volume_fit/src/app/app_router.dart';
 import 'package:volume_fit/src/app/volume_fit_app.dart';
+import 'package:volume_fit/src/features/ai_export/data/ai_export_history_repository.dart';
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
 import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
@@ -377,6 +378,48 @@ void main() {
     );
   });
 
+  testWidgets('saves generated AI markdown history', (
+    WidgetTester tester,
+  ) async {
+    final repository = _SuccessfulAiExportHistoryRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          aiExportHistoryRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AI出力を作成'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('aiBodyWeightField')), '80');
+    await tester.enterText(find.byKey(const Key('aiRepsField')), '12');
+    await tester.tap(find.byKey(const Key('aiRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 2').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('aiGenerateMarkdownButton')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('aiSaveHistoryButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('aiSaveHistoryButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('AI出力履歴を保存しました'), findsOneWidget);
+    expect(repository.saveCallCount, 1);
+    expect(repository.lastDraft?.markdownContent, contains('# AIトレーニングレビュー依頼'));
+    expect(repository.lastDraft?.calculationVersion, 'standard-v1');
+    expect(repository.lastDraft?.promptVersion, 'prompt-v1');
+    final snapshot = repository.lastDraft?.calculationSnapshot;
+    final sets = snapshot?['sets'] as List<Object?>;
+    final set = sets.single as Map<String, Object?>;
+    expect(set['estimatedLoadKg'], closeTo(57.6, 0.001));
+  });
+
   testWidgets('shows pending save status', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -673,6 +716,18 @@ class _FailingWorkoutSetInputRepository implements WorkoutSetInputRepository {
   @override
   Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft) async {
     throw const WorkoutSetInputFailure('保存に失敗しました');
+  }
+}
+
+class _SuccessfulAiExportHistoryRepository
+    implements AiExportHistoryRepository {
+  int saveCallCount = 0;
+  AiExportHistoryDraft? lastDraft;
+
+  @override
+  Future<void> saveHistory(AiExportHistoryDraft draft) async {
+    saveCallCount += 1;
+    lastDraft = draft;
   }
 }
 
