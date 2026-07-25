@@ -213,6 +213,50 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     return true;
   }
 
+  bool duplicateLatestSet() {
+    final currentState = state.value ?? const WorkoutSetInputState();
+    if (currentState.sets.isEmpty) {
+      state = AsyncData(
+        WorkoutSetInputState(
+          draft: currentState.draft,
+          sets: currentState.sets,
+          errorMessage: '複製できるセットがありません',
+        ),
+      );
+      return false;
+    }
+
+    final latest = currentState.sets.last;
+    final duplicated = WorkoutSetDraft(
+      order: currentState.sets.length + 1,
+      exerciseId: latest.exerciseId,
+      bodyWeightKg: latest.bodyWeightKg,
+      bodyWeightLoadRatio: latest.bodyWeightLoadRatio,
+      addedWeightKg: latest.addedWeightKg,
+      assistanceWeightKg: latest.assistanceWeightKg,
+      reps: latest.reps,
+      rir: latest.rir,
+    );
+
+    state = AsyncData(
+      WorkoutSetInputState(
+        draft: WorkoutSetInputDraft(
+          exerciseId: duplicated.exerciseId,
+          bodyWeightText: _textForWeight(duplicated.bodyWeightKg),
+          bodyWeightLoadRatio: duplicated.bodyWeightLoadRatio,
+          addedWeightText: _optionalTextForWeight(duplicated.addedWeightKg),
+          assistanceWeightText: _optionalTextForWeight(
+            duplicated.assistanceWeightKg,
+          ),
+          repsText: duplicated.reps.toString(),
+          rir: duplicated.rir,
+        ),
+        sets: [...currentState.sets, duplicated],
+      ),
+    );
+    return true;
+  }
+
   Future<bool> saveSession() async {
     final currentState = state.value ?? const WorkoutSetInputState();
     if (currentState.sets.isEmpty) {
@@ -392,5 +436,21 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     }
 
     return parsed;
+  }
+
+  String _textForWeight(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+
+    return value.toStringAsFixed(1);
+  }
+
+  String _optionalTextForWeight(double value) {
+    if (value == 0) {
+      return '';
+    }
+
+    return _textForWeight(value);
   }
 }

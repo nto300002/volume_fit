@@ -279,6 +279,12 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                     child: const Text('セットを更新'),
                   ),
                 if (inputState?.sets.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    key: const Key('workoutDuplicateLatestSetButton'),
+                    onPressed: isSaving ? null : _duplicateLatestSet,
+                    child: const Text('直前セットを複製'),
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     '追加済みセット',
@@ -483,17 +489,46 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     }
   }
 
+  void _duplicateLatestSet() {
+    final duplicated = ref
+        .read(workoutSetInputControllerProvider.notifier)
+        .duplicateLatestSet();
+    if (!duplicated) {
+      return;
+    }
+
+    final sets = ref.read(workoutSetInputControllerProvider).value?.sets;
+    final duplicatedSet = sets == null || sets.isEmpty ? null : sets.last;
+    if (duplicatedSet == null) {
+      return;
+    }
+
+    setState(() {
+      _editingOrder = null;
+      _exerciseId = duplicatedSet.exerciseId;
+      _bodyWeightController.text = _weightText(duplicatedSet.bodyWeightKg);
+      _addedWeightController.text = duplicatedSet.addedWeightKg == 0
+          ? ''
+          : _weightText(duplicatedSet.addedWeightKg);
+      _assistanceWeightController.text = duplicatedSet.assistanceWeightKg == 0
+          ? ''
+          : _weightText(duplicatedSet.assistanceWeightKg);
+      _repsController.text = duplicatedSet.reps.toString();
+      _rir = duplicatedSet.rir;
+    });
+  }
+
   void _editSet(WorkoutSetDraft set) {
     setState(() {
       _editingOrder = set.order;
       _exerciseId = set.exerciseId;
-      _bodyWeightController.text = set.bodyWeightKg.toStringAsFixed(0);
+      _bodyWeightController.text = _weightText(set.bodyWeightKg);
       _addedWeightController.text = set.addedWeightKg == 0
           ? ''
-          : set.addedWeightKg.toStringAsFixed(1);
+          : _weightText(set.addedWeightKg);
       _assistanceWeightController.text = set.assistanceWeightKg == 0
           ? ''
-          : set.assistanceWeightKg.toStringAsFixed(1);
+          : _weightText(set.assistanceWeightKg);
       _repsController.text = set.reps.toString();
       _rir = set.rir;
     });
@@ -507,6 +542,14 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     return ref
         .read(calculationSettingsProvider)
         .bodyWeightLoadRatioFor(exerciseId);
+  }
+
+  String _weightText(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+
+    return value.toStringAsFixed(1);
   }
 
   double? _estimatedLoad() {

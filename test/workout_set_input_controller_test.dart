@@ -277,6 +277,60 @@ void main() {
     expect(state?.sets.last.rir, 1);
   });
 
+  test('duplicates the latest set with a new order', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      workoutSetInputControllerProvider.notifier,
+    );
+    controller.addSet(
+      exerciseId: 'push_up',
+      bodyWeightText: '80',
+      bodyWeightLoadRatio: 0.72,
+      addedWeightText: '5',
+      assistanceWeightText: '2',
+      repsText: '12',
+      rir: 2,
+    );
+
+    final duplicated = controller.duplicateLatestSet();
+
+    final state = container.read(workoutSetInputControllerProvider).value;
+    expect(duplicated, isTrue);
+    expect(state?.sets.map((set) => set.order), [1, 2]);
+    expect(state?.sets.map((set) => set.reps), [12, 12]);
+    expect(state?.sets.map((set) => set.rir), [2, 2]);
+    expect(state?.sets.last.bodyWeightKg, 80);
+    expect(state?.sets.last.bodyWeightLoadRatio, 0.72);
+    expect(state?.sets.last.addedWeightKg, 5);
+    expect(state?.sets.last.assistanceWeightKg, 2);
+  });
+
+  test('does not duplicate when no set exists', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final duplicated = container
+        .read(workoutSetInputControllerProvider.notifier)
+        .duplicateLatestSet();
+
+    final state = container.read(workoutSetInputControllerProvider).value;
+    expect(duplicated, isFalse);
+    expect(state?.sets, isEmpty);
+    expect(state?.errorMessage, '複製できるセットがありません');
+  });
+
   test('saves added sets as one session draft', () async {
     final repository = FakeWorkoutSetInputRepository();
     final container = ProviderContainer(
