@@ -377,6 +377,8 @@ void main() {
     await tester.tap(find.byKey(const Key('workoutAddSetButton')));
     await tester.pumpAndSettle();
 
+    await tester.dragFrom(const Offset(400, 550), const Offset(0, -300));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('workoutEditSetButton-2')));
     await tester.pumpAndSettle();
     await _enterWorkoutSet(
@@ -403,6 +405,68 @@ void main() {
     expect(find.text('保存済みです'), findsOneWidget);
     expect(repository.lastSessionDraft?.sets.map((set) => set.order), [1, 2]);
     expect(repository.lastSessionDraft?.sets.map((set) => set.reps), [12, 8]);
+  });
+
+  testWidgets('duplicates the previous workout set and allows editing it', (
+    WidgetTester tester,
+  ) async {
+    final repository = _SuccessfulWorkoutSetInputRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          workoutSetInputRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await _selectPushUp(tester);
+    await _enterWorkoutSet(
+      tester,
+      bodyWeight: '80',
+      reps: '12',
+      rirLabel: 'RIR 2',
+    );
+    await tester.ensureVisible(find.byKey(const Key('workoutAddSetButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutAddSetButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('workoutDuplicateLatestSetButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('セット 1: 12回 / RIR 2'), findsOneWidget);
+    expect(find.text('セット 2: 12回 / RIR 2'), findsOneWidget);
+
+    await tester.dragFrom(const Offset(400, 550), const Offset(0, -300));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutEditSetButton-2')));
+    await tester.pumpAndSettle();
+    await _enterWorkoutSet(
+      tester,
+      bodyWeight: '80',
+      reps: '9',
+      rirLabel: 'RIR 1',
+    );
+    await tester.ensureVisible(find.byKey(const Key('workoutUpdateSetButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('workoutUpdateSetButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('セット 2: 9回 / RIR 1'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastSessionDraft?.sets.map((set) => set.order), [1, 2]);
+    expect(repository.lastSessionDraft?.sets.map((set) => set.reps), [12, 9]);
   });
 
   testWidgets('generates AI markdown preview from one push-up set', (
