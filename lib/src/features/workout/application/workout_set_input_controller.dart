@@ -19,11 +19,13 @@ enum WorkoutSetSaveStatus {
 class WorkoutSetInputState {
   const WorkoutSetInputState({
     this.draft = const WorkoutSetInputDraft(),
+    this.sets = const [],
     this.saveStatus = WorkoutSetSaveStatus.idle,
     this.errorMessage,
   });
 
   final WorkoutSetInputDraft draft;
+  final List<WorkoutSetDraft> sets;
   final WorkoutSetSaveStatus saveStatus;
   final String? errorMessage;
 
@@ -38,6 +40,16 @@ class WorkoutSetInputState {
       WorkoutSetSaveStatus.failed => errorMessage,
       WorkoutSetSaveStatus.idle => null,
     };
+  }
+
+  double get sessionVolumeKg {
+    return sets.fold(0, (sum, set) {
+      final estimatedLoad =
+          set.bodyWeightKg * set.bodyWeightLoadRatio +
+          set.addedWeightKg -
+          set.assistanceWeightKg;
+      return sum + estimatedLoad * set.reps;
+    });
   }
 }
 
@@ -84,81 +96,19 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       rir: rir,
     );
 
-    final selectedExerciseId = exerciseId;
-    if (selectedExerciseId == null || selectedExerciseId.isEmpty) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '種目を選択してください'),
-      );
-      return false;
-    }
-
-    final reps = int.tryParse(repsText.trim());
-    if (reps == null || reps < 1) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '回数は1回以上で入力してください'),
-      );
-      return false;
-    }
-
-    final bodyWeight = double.tryParse((bodyWeightText ?? '').trim());
-    if (bodyWeight == null) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '体重を入力してください'),
-      );
-      return false;
-    }
-
-    if (bodyWeight <= 0 || bodyWeight > 500) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '体重は0より大きい値で入力してください'),
-      );
-      return false;
-    }
-
-    final selectedBodyWeightLoadRatio = bodyWeightLoadRatio;
-    if (selectedBodyWeightLoadRatio == null ||
-        selectedBodyWeightLoadRatio < 0 ||
-        selectedBodyWeightLoadRatio > 1) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '自重負荷係数を確認してください'),
-      );
-      return false;
-    }
-
-    final addedWeight = _optionalWeight(addedWeightText);
-    if (addedWeight == null) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '追加重量は0以上で入力してください'),
-      );
-      return false;
-    }
-
-    final assistanceWeight = _optionalWeight(assistanceWeightText);
-    if (assistanceWeight == null) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '補助重量は0以上で入力してください'),
-      );
-      return false;
-    }
-
-    final selectedRir = rir;
-    if (selectedRir == null) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: 'RIRを選択してください'),
-      );
-      return false;
-    }
-
-    if (selectedRir < 0 || selectedRir > 10) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: 'RIRは0から10で選択してください'),
-      );
+    final validatedDraft = _validatedSetDraft(
+      order: 1,
+      draft: draft,
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
+    );
+    if (validatedDraft == null) {
       return false;
     }
 
     state = AsyncData(
       WorkoutSetInputState(
         draft: draft,
+        sets: state.value?.sets ?? const [],
         saveStatus: WorkoutSetSaveStatus.saving,
       ),
     );
@@ -166,25 +116,147 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     try {
       final result = await ref
           .read(workoutSetInputRepositoryProvider)
-          .saveDraftSet(
-            WorkoutSetDraft(
-              exerciseId: selectedExerciseId,
-              bodyWeightKg: bodyWeight,
-              bodyWeightLoadRatio: selectedBodyWeightLoadRatio,
-              addedWeightKg: addedWeight,
-              assistanceWeightKg: assistanceWeight,
-              reps: reps,
-              rir: selectedRir,
-            ),
-          );
+          .saveDraftSet(validatedDraft);
       state = AsyncData(
-        WorkoutSetInputState(draft: draft, saveStatus: _saveStatusFor(result)),
+        WorkoutSetInputState(
+          draft: draft,
+          sets: state.value?.sets ?? const [],
+          saveStatus: _saveStatusFor(result),
+        ),
       );
       return true;
     } on WorkoutSetInputFailure catch (error) {
       state = AsyncData(
         WorkoutSetInputState(
           draft: draft,
+          sets: state.value?.sets ?? const [],
+          saveStatus: WorkoutSetSaveStatus.failed,
+          errorMessage: error.message,
+        ),
+      );
+      return false;
+    }
+  }
+
+  bool addSet({
+    String? exerciseId,
+    String? bodyWeightText,
+    double? bodyWeightLoadRatio,
+    String? addedWeightText,
+    String? assistanceWeightText,
+    required String repsText,
+    int? rir,
+  }) {
+    final currentState = state.value ?? const WorkoutSetInputState();
+    final draft = WorkoutSetInputDraft(
+      exerciseId: exerciseId,
+      bodyWeightText: bodyWeightText ?? '',
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
+      addedWeightText: addedWeightText ?? '',
+      assistanceWeightText: assistanceWeightText ?? '',
+      repsText: repsText,
+      rir: rir,
+    );
+    final set = _validatedSetDraft(
+      order: currentState.sets.length + 1,
+      draft: draft,
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
+    );
+    if (set == null) {
+      return false;
+    }
+
+    state = AsyncData(
+      WorkoutSetInputState(draft: draft, sets: [...currentState.sets, set]),
+    );
+    return true;
+  }
+
+  bool updateSet({
+    required int order,
+    String? exerciseId,
+    String? bodyWeightText,
+    double? bodyWeightLoadRatio,
+    String? addedWeightText,
+    String? assistanceWeightText,
+    required String repsText,
+    int? rir,
+  }) {
+    final currentState = state.value ?? const WorkoutSetInputState();
+    final draft = WorkoutSetInputDraft(
+      exerciseId: exerciseId,
+      bodyWeightText: bodyWeightText ?? '',
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
+      addedWeightText: addedWeightText ?? '',
+      assistanceWeightText: assistanceWeightText ?? '',
+      repsText: repsText,
+      rir: rir,
+    );
+    final set = _validatedSetDraft(
+      order: order,
+      draft: draft,
+      bodyWeightLoadRatio: bodyWeightLoadRatio,
+    );
+    if (set == null) {
+      return false;
+    }
+
+    state = AsyncData(
+      WorkoutSetInputState(
+        draft: draft,
+        sets: [
+          for (final existing in currentState.sets)
+            if (existing.order == order) set else existing,
+        ],
+      ),
+    );
+    return true;
+  }
+
+  Future<bool> saveSession() async {
+    final currentState = state.value ?? const WorkoutSetInputState();
+    if (currentState.sets.isEmpty) {
+      return saveSet(
+        exerciseId: currentState.draft.exerciseId,
+        bodyWeightText: currentState.draft.bodyWeightText,
+        bodyWeightLoadRatio: currentState.draft.bodyWeightLoadRatio,
+        addedWeightText: currentState.draft.addedWeightText,
+        assistanceWeightText: currentState.draft.assistanceWeightText,
+        repsText: currentState.draft.repsText,
+        rir: currentState.draft.rir,
+      );
+    }
+
+    state = AsyncData(
+      WorkoutSetInputState(
+        draft: currentState.draft,
+        sets: currentState.sets,
+        saveStatus: WorkoutSetSaveStatus.saving,
+      ),
+    );
+
+    try {
+      final result = await ref
+          .read(workoutSetInputRepositoryProvider)
+          .saveSession(
+            WorkoutSessionDraft(
+              exerciseId: currentState.sets.first.exerciseId,
+              sets: currentState.sets,
+            ),
+          );
+      state = AsyncData(
+        WorkoutSetInputState(
+          draft: currentState.draft,
+          sets: currentState.sets,
+          saveStatus: _saveStatusFor(result),
+        ),
+      );
+      return true;
+    } on WorkoutSetInputFailure catch (error) {
+      state = AsyncData(
+        WorkoutSetInputState(
+          draft: currentState.draft,
+          sets: currentState.sets,
           saveStatus: WorkoutSetSaveStatus.failed,
           errorMessage: error.message,
         ),
@@ -207,6 +279,95 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       assistanceWeightText: draft.assistanceWeightText,
       repsText: draft.repsText,
       rir: draft.rir,
+    );
+  }
+
+  WorkoutSetDraft? _validatedSetDraft({
+    required int order,
+    required WorkoutSetInputDraft draft,
+    required double? bodyWeightLoadRatio,
+  }) {
+    final selectedExerciseId = draft.exerciseId;
+    if (selectedExerciseId == null || selectedExerciseId.isEmpty) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '種目を選択してください'),
+      );
+      return null;
+    }
+
+    final reps = int.tryParse(draft.repsText.trim());
+    if (reps == null || reps < 1) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '回数は1回以上で入力してください'),
+      );
+      return null;
+    }
+
+    final bodyWeight = double.tryParse(draft.bodyWeightText.trim());
+    if (bodyWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重を入力してください'),
+      );
+      return null;
+    }
+
+    if (bodyWeight <= 0 || bodyWeight > 500) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重は0より大きい値で入力してください'),
+      );
+      return null;
+    }
+
+    final selectedBodyWeightLoadRatio = bodyWeightLoadRatio;
+    if (selectedBodyWeightLoadRatio == null ||
+        selectedBodyWeightLoadRatio < 0 ||
+        selectedBodyWeightLoadRatio > 1) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '自重負荷係数を確認してください'),
+      );
+      return null;
+    }
+
+    final addedWeight = _optionalWeight(draft.addedWeightText);
+    if (addedWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '追加重量は0以上で入力してください'),
+      );
+      return null;
+    }
+
+    final assistanceWeight = _optionalWeight(draft.assistanceWeightText);
+    if (assistanceWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '補助重量は0以上で入力してください'),
+      );
+      return null;
+    }
+
+    final selectedRir = draft.rir;
+    if (selectedRir == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: 'RIRを選択してください'),
+      );
+      return null;
+    }
+
+    if (selectedRir < 0 || selectedRir > 10) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: 'RIRは0から10で選択してください'),
+      );
+      return null;
+    }
+
+    return WorkoutSetDraft(
+      order: order,
+      exerciseId: selectedExerciseId,
+      bodyWeightKg: bodyWeight,
+      bodyWeightLoadRatio: selectedBodyWeightLoadRatio,
+      addedWeightKg: addedWeight,
+      assistanceWeightKg: assistanceWeight,
+      reps: reps,
+      rir: selectedRir,
     );
   }
 

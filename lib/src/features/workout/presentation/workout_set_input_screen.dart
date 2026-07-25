@@ -6,6 +6,7 @@ import '../../../app/app_router.dart';
 import '../../auth/application/logout_controller.dart';
 import '../application/workout_set_input_controller.dart';
 import '../data/calculation_settings.dart';
+import '../data/workout_set_input_repository.dart';
 import '../domain/bodyweight_load_calculator.dart';
 import '../domain/hard_set_judge.dart';
 import '../domain/rir_adjusted_volume_calculator.dart';
@@ -26,6 +27,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   final _assistanceWeightController = TextEditingController();
   String? _exerciseId;
   int? _rir;
+  int? _editingOrder;
 
   @override
   void dispose() {
@@ -46,6 +48,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final setVolume = _setVolume(estimatedLoad);
     final rirAdjustedVolume = _rirAdjustedVolume(setVolume);
     final hardSet = _hardSetJudgement();
+    final sessionVolume = inputState?.sessionVolumeKg ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -263,6 +266,92 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
+                if (_editingOrder == null)
+                  OutlinedButton(
+                    key: const Key('workoutAddSetButton'),
+                    onPressed: isSaving ? null : _addSet,
+                    child: const Text('セットを追加'),
+                  )
+                else
+                  OutlinedButton(
+                    key: const Key('workoutUpdateSetButton'),
+                    onPressed: isSaving ? null : _updateSet,
+                    child: const Text('セットを更新'),
+                  ),
+                if (inputState?.sets.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '追加済みセット',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final set in inputState!.sets) ...[
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'セット ${set.order}: ${set.reps}回 / RIR ${set.rir}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            TextButton(
+                              key: Key('workoutEditSetButton-${set.order}'),
+                              onPressed: isSaving ? null : () => _editSet(set),
+                              child: const Text('編集'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'セッションボリューム（概算）',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            '${sessionVolume.toStringAsFixed(1)} kg',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 16),
                 if (inputState?.statusMessage != null) ...[
                   Text(
                     inputState!.statusMessage!,
@@ -322,22 +411,102 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   }
 
   Future<void> _save() async {
+    final inputState = ref.read(workoutSetInputControllerProvider).value;
+    if (inputState?.sets.isNotEmpty ?? false) {
+      await ref.read(workoutSetInputControllerProvider.notifier).saveSession();
+      return;
+    }
+
     final exerciseId = _exerciseId;
     await ref
         .read(workoutSetInputControllerProvider.notifier)
         .saveSet(
           exerciseId: exerciseId,
           bodyWeightText: _bodyWeightController.text,
-          bodyWeightLoadRatio: exerciseId == null
-              ? null
-              : ref
-                    .read(calculationSettingsProvider)
-                    .bodyWeightLoadRatioFor(exerciseId),
+          bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
           addedWeightText: _addedWeightController.text,
           assistanceWeightText: _assistanceWeightController.text,
           repsText: _repsController.text,
           rir: _rir,
         );
+  }
+
+  void _addSet() {
+    final exerciseId = _exerciseId;
+    final added = ref
+        .read(workoutSetInputControllerProvider.notifier)
+        .addSet(
+          exerciseId: exerciseId,
+          bodyWeightText: _bodyWeightController.text,
+          bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
+          addedWeightText: _addedWeightController.text,
+          assistanceWeightText: _assistanceWeightController.text,
+          repsText: _repsController.text,
+          rir: _rir,
+        );
+
+    if (added) {
+      setState(() {
+        _editingOrder = null;
+        _repsController.clear();
+        _rir = null;
+      });
+    }
+  }
+
+  void _updateSet() {
+    final exerciseId = _exerciseId;
+    final editingOrder = _editingOrder;
+    if (editingOrder == null) {
+      return;
+    }
+
+    final updated = ref
+        .read(workoutSetInputControllerProvider.notifier)
+        .updateSet(
+          order: editingOrder,
+          exerciseId: exerciseId,
+          bodyWeightText: _bodyWeightController.text,
+          bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
+          addedWeightText: _addedWeightController.text,
+          assistanceWeightText: _assistanceWeightController.text,
+          repsText: _repsController.text,
+          rir: _rir,
+        );
+
+    if (updated) {
+      setState(() {
+        _editingOrder = null;
+        _repsController.clear();
+        _rir = null;
+      });
+    }
+  }
+
+  void _editSet(WorkoutSetDraft set) {
+    setState(() {
+      _editingOrder = set.order;
+      _exerciseId = set.exerciseId;
+      _bodyWeightController.text = set.bodyWeightKg.toStringAsFixed(0);
+      _addedWeightController.text = set.addedWeightKg == 0
+          ? ''
+          : set.addedWeightKg.toStringAsFixed(1);
+      _assistanceWeightController.text = set.assistanceWeightKg == 0
+          ? ''
+          : set.assistanceWeightKg.toStringAsFixed(1);
+      _repsController.text = set.reps.toString();
+      _rir = set.rir;
+    });
+  }
+
+  double? _bodyWeightLoadRatioFor(String? exerciseId) {
+    if (exerciseId == null) {
+      return null;
+    }
+
+    return ref
+        .read(calculationSettingsProvider)
+        .bodyWeightLoadRatioFor(exerciseId);
   }
 
   double? _estimatedLoad() {

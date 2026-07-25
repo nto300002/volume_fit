@@ -196,6 +196,122 @@ void main() {
     expect(repository.lastDraft?.reps, 15);
     expect(state?.saveStatus, WorkoutSetSaveStatus.saved);
   });
+
+  test('adds multiple sets and aggregates session volume', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      workoutSetInputControllerProvider.notifier,
+    );
+
+    final firstAdded = controller.addSet(
+      exerciseId: 'push_up',
+      bodyWeightText: '80',
+      bodyWeightLoadRatio: 0.72,
+      repsText: '12',
+      rir: 2,
+    );
+    final secondAdded = controller.addSet(
+      exerciseId: 'push_up',
+      bodyWeightText: '80',
+      bodyWeightLoadRatio: 0.72,
+      repsText: '10',
+      rir: 3,
+    );
+
+    final state = container.read(workoutSetInputControllerProvider).value;
+    expect(firstAdded, isTrue);
+    expect(secondAdded, isTrue);
+    expect(state?.sets.map((set) => set.order), [1, 2]);
+    expect(state?.sets.map((set) => set.reps), [12, 10]);
+    expect(state?.sessionVolumeKg, closeTo(1267.2, 0.001));
+  });
+
+  test('edits an added set while keeping order', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      workoutSetInputControllerProvider.notifier,
+    );
+    controller
+      ..addSet(
+        exerciseId: 'push_up',
+        bodyWeightText: '80',
+        bodyWeightLoadRatio: 0.72,
+        repsText: '12',
+        rir: 2,
+      )
+      ..addSet(
+        exerciseId: 'push_up',
+        bodyWeightText: '80',
+        bodyWeightLoadRatio: 0.72,
+        repsText: '10',
+        rir: 3,
+      );
+
+    final edited = controller.updateSet(
+      order: 2,
+      exerciseId: 'push_up',
+      bodyWeightText: '80',
+      bodyWeightLoadRatio: 0.72,
+      repsText: '8',
+      rir: 1,
+    );
+
+    final state = container.read(workoutSetInputControllerProvider).value;
+    expect(edited, isTrue);
+    expect(state?.sets.map((set) => set.order), [1, 2]);
+    expect(state?.sets.map((set) => set.reps), [12, 8]);
+    expect(state?.sets.last.rir, 1);
+  });
+
+  test('saves added sets as one session draft', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final controller = container.read(
+      workoutSetInputControllerProvider.notifier,
+    );
+    controller
+      ..addSet(
+        exerciseId: 'push_up',
+        bodyWeightText: '80',
+        bodyWeightLoadRatio: 0.72,
+        repsText: '12',
+        rir: 2,
+      )
+      ..addSet(
+        exerciseId: 'push_up',
+        bodyWeightText: '80',
+        bodyWeightLoadRatio: 0.72,
+        repsText: '10',
+        rir: 3,
+      );
+
+    final succeeded = await controller.saveSession();
+
+    expect(succeeded, isTrue);
+    expect(repository.saveSessionCallCount, 1);
+    expect(repository.lastSessionDraft?.sets.map((set) => set.order), [1, 2]);
+    expect(repository.lastSessionDraft?.sets.map((set) => set.reps), [12, 10]);
+  });
 }
 
 class FakeWorkoutSetInputRepository implements WorkoutSetInputRepository {
@@ -207,12 +323,27 @@ class FakeWorkoutSetInputRepository implements WorkoutSetInputRepository {
   WorkoutSetInputFailure? failure;
   WorkoutSetSaveResult result;
   int saveCallCount = 0;
+  int saveSessionCallCount = 0;
   WorkoutSetDraft? lastDraft;
+  WorkoutSessionDraft? lastSessionDraft;
 
   @override
   Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft) async {
     saveCallCount += 1;
     lastDraft = draft;
+
+    final failure = this.failure;
+    if (failure != null) {
+      throw failure;
+    }
+
+    return result;
+  }
+
+  @override
+  Future<WorkoutSetSaveResult> saveSession(WorkoutSessionDraft draft) async {
+    saveSessionCallCount += 1;
+    lastSessionDraft = draft;
 
     final failure = this.failure;
     if (failure != null) {
