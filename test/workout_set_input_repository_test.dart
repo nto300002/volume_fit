@@ -96,6 +96,64 @@ void main() {
       throwsA(isA<WorkoutSetInputFailure>()),
     );
   });
+
+  test('saves multiple sets with stable ids and order', () async {
+    final writer = FakeWorkoutSessionWriter();
+    final now = DateTime.utc(2026, 7, 25, 1, 2, 3);
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutSessionWriterProvider.overrideWithValue(writer),
+        clockProvider.overrideWithValue(() => now),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(workoutSetInputRepositoryProvider)
+        .saveSession(
+          const WorkoutSessionDraft(
+            exerciseId: 'push_up',
+            sets: [
+              WorkoutSetDraft(
+                order: 1,
+                exerciseId: 'push_up',
+                bodyWeightKg: 80,
+                bodyWeightLoadRatio: 0.72,
+                addedWeightKg: 0,
+                assistanceWeightKg: 0,
+                reps: 12,
+                rir: 2,
+              ),
+              WorkoutSetDraft(
+                order: 2,
+                exerciseId: 'push_up',
+                bodyWeightKg: 80,
+                bodyWeightLoadRatio: 0.72,
+                addedWeightKg: 0,
+                assistanceWeightKg: 0,
+                reps: 10,
+                rir: 3,
+              ),
+            ],
+          ),
+        );
+
+    final data = writer.data;
+    final exercises = data?['exercises'] as List<Object?>;
+    final exercise = exercises.single as Map<String, Object?>;
+    final sets = exercise['sets'] as List<Object?>;
+    final first = sets.first as Map<String, Object?>;
+    final second = sets.last as Map<String, Object?>;
+
+    expect(sets.length, 2);
+    expect(first['setId'], 'set-1');
+    expect(first['order'], 1);
+    expect(first['reps'], 12);
+    expect(second['setId'], 'set-2');
+    expect(second['order'], 2);
+    expect(second['reps'], 10);
+  });
 }
 
 class FakeWorkoutSessionWriter implements WorkoutSessionWriter {

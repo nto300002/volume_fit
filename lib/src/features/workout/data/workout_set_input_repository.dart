@@ -22,6 +22,7 @@ final workoutSetInputRepositoryProvider = Provider<WorkoutSetInputRepository>(
 
 abstract interface class WorkoutSetInputRepository {
   Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft);
+  Future<WorkoutSetSaveResult> saveSession(WorkoutSessionDraft draft);
 }
 
 enum WorkoutSetSaveResult { saved, pending, offlinePending }
@@ -35,6 +36,7 @@ abstract interface class WorkoutSessionWriter {
 
 class WorkoutSetDraft {
   const WorkoutSetDraft({
+    this.order = 1,
     required this.exerciseId,
     required this.bodyWeightKg,
     required this.bodyWeightLoadRatio,
@@ -44,6 +46,7 @@ class WorkoutSetDraft {
     required this.rir,
   });
 
+  final int order;
   final String exerciseId;
   final double bodyWeightKg;
   final double bodyWeightLoadRatio;
@@ -51,6 +54,13 @@ class WorkoutSetDraft {
   final double assistanceWeightKg;
   final int reps;
   final int rir;
+}
+
+class WorkoutSessionDraft {
+  const WorkoutSessionDraft({required this.exerciseId, required this.sets});
+
+  final String exerciseId;
+  final List<WorkoutSetDraft> sets;
 }
 
 class WorkoutSetInputFailure implements Exception {
@@ -72,6 +82,13 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
 
   @override
   Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft) async {
+    return saveSession(
+      WorkoutSessionDraft(exerciseId: draft.exerciseId, sets: [draft]),
+    );
+  }
+
+  @override
+  Future<WorkoutSetSaveResult> saveSession(WorkoutSessionDraft draft) async {
     final ownerUserId = currentAuthUserId;
     if (ownerUserId == null) {
       throw const WorkoutSetInputFailure('ログイン状態を確認してください');
@@ -98,9 +115,11 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
 
   Map<String, Object?> _sessionData({
     required String ownerUserId,
-    required WorkoutSetDraft draft,
+    required WorkoutSessionDraft draft,
     required DateTime now,
   }) {
+    final firstSet = draft.sets.first;
+
     return {
       'schemaVersion': 1,
       'ownerUserId': ownerUserId,
@@ -109,7 +128,7 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
       'startedAt': now,
       'completedAt': now,
       'condition': {
-        'bodyWeightKg': draft.bodyWeightKg,
+        'bodyWeightKg': firstSet.bodyWeightKg,
         'sleepMinutes': null,
         'fatigueLevel': null,
         'sorenessLevel': null,
@@ -130,22 +149,23 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
             {'muscleId': 'front_deltoid', 'allocation': 0.5},
           ],
           'sets': [
-            {
-              'setId': 'set-1',
-              'order': 1,
-              'externalWeightKg': null,
-              'bodyWeightKg': draft.bodyWeightKg,
-              'bodyWeightLoadRatio': draft.bodyWeightLoadRatio,
-              'addedWeightKg': draft.addedWeightKg,
-              'assistanceWeightKg': draft.assistanceWeightKg,
-              'reps': draft.reps,
-              'rir': draft.rir,
-              'result': 'completed',
-              'rangeOfMotion': 'full',
-              'tempo': null,
-              'restSeconds': null,
-              'memo': null,
-            },
+            for (final set in draft.sets)
+              {
+                'setId': 'set-${set.order}',
+                'order': set.order,
+                'externalWeightKg': null,
+                'bodyWeightKg': set.bodyWeightKg,
+                'bodyWeightLoadRatio': set.bodyWeightLoadRatio,
+                'addedWeightKg': set.addedWeightKg,
+                'assistanceWeightKg': set.assistanceWeightKg,
+                'reps': set.reps,
+                'rir': set.rir,
+                'result': 'completed',
+                'rangeOfMotion': 'full',
+                'tempo': null,
+                'restSeconds': null,
+                'memo': null,
+              },
           ],
           'memo': null,
         },
