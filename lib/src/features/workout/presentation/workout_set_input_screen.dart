@@ -8,6 +8,7 @@ import '../application/workout_set_input_controller.dart';
 import '../data/calculation_settings.dart';
 import '../data/workout_set_input_repository.dart';
 import '../domain/bodyweight_load_calculator.dart';
+import '../domain/external_weight_load_calculator.dart';
 import '../domain/hard_set_judge.dart';
 import '../domain/rir_adjusted_volume_calculator.dart';
 import '../domain/set_volume_calculator.dart';
@@ -23,6 +24,8 @@ class WorkoutSetInputScreen extends ConsumerStatefulWidget {
 class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   final _repsController = TextEditingController();
   final _bodyWeightController = TextEditingController();
+  final _externalWeightController = TextEditingController();
+  final _externalLoadCountController = TextEditingController();
   final _addedWeightController = TextEditingController();
   final _assistanceWeightController = TextEditingController();
   String? _exerciseId;
@@ -33,6 +36,8 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
   void dispose() {
     _repsController.dispose();
     _bodyWeightController.dispose();
+    _externalWeightController.dispose();
+    _externalLoadCountController.dispose();
     _addedWeightController.dispose();
     _assistanceWeightController.dispose();
     super.dispose();
@@ -49,6 +54,7 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final rirAdjustedVolume = _rirAdjustedVolume(setVolume);
     final hardSet = _hardSetJudgement();
     final sessionVolume = inputState?.sessionVolumeKg ?? 0;
+    final isExternalExercise = _isExternalWeightExercise(_exerciseId);
 
     return Scaffold(
       appBar: AppBar(
@@ -95,10 +101,28 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'push_up', child: Text('腕立て伏せ')),
+                    DropdownMenuItem(
+                      value: 'bench_press',
+                      child: Text('ベンチプレス'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'dumbbell_curl',
+                      child: Text('ダンベルカール'),
+                    ),
                   ],
                   onChanged: isSaving
                       ? null
-                      : (value) => setState(() => _exerciseId = value),
+                      : (value) => setState(() {
+                          _exerciseId = value;
+                          if (_isExternalWeightExercise(value)) {
+                            _bodyWeightController.clear();
+                            _addedWeightController.clear();
+                            _assistanceWeightController.clear();
+                          } else {
+                            _externalWeightController.clear();
+                            _externalLoadCountController.clear();
+                          }
+                        }),
                 ),
                 const SizedBox(height: 12),
                 TextField(
@@ -113,41 +137,69 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  key: const Key('workoutBodyWeightField'),
-                  controller: _bodyWeightController,
-                  enabled: !isSaving,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: '体重 kg',
-                    border: OutlineInputBorder(),
+                if (isExternalExercise) ...[
+                  TextField(
+                    key: const Key('workoutExternalWeightField'),
+                    controller: _externalWeightController,
+                    enabled: !isSaving,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '重量 kg',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  key: const Key('workoutAddedWeightField'),
-                  controller: _addedWeightController,
-                  enabled: !isSaving,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: '追加重量 kg',
-                    border: OutlineInputBorder(),
+                  if (_exerciseId == 'dumbbell_curl') ...[
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('workoutExternalLoadCountField'),
+                      controller: _externalLoadCountController,
+                      enabled: !isSaving,
+                      keyboardType: TextInputType.number,
+                      onChanged: (_) => setState(() {}),
+                      decoration: const InputDecoration(
+                        labelText: '個数',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                ] else ...[
+                  TextField(
+                    key: const Key('workoutBodyWeightField'),
+                    controller: _bodyWeightController,
+                    enabled: !isSaving,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '体重 kg',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  key: const Key('workoutAssistanceWeightField'),
-                  controller: _assistanceWeightController,
-                  enabled: !isSaving,
-                  keyboardType: TextInputType.number,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: '補助重量 kg',
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('workoutAddedWeightField'),
+                    controller: _addedWeightController,
+                    enabled: !isSaving,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '追加重量 kg',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    key: const Key('workoutAssistanceWeightField'),
+                    controller: _assistanceWeightController,
+                    enabled: !isSaving,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: '補助重量 kg',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 if (estimatedLoad != null) ...[
                   DecoratedBox(
@@ -430,6 +482,8 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
           exerciseId: exerciseId,
           bodyWeightText: _bodyWeightController.text,
           bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
+          externalWeightText: _externalWeightController.text,
+          externalLoadCountText: _externalLoadCountController.text,
           addedWeightText: _addedWeightController.text,
           assistanceWeightText: _assistanceWeightController.text,
           repsText: _repsController.text,
@@ -445,6 +499,8 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
           exerciseId: exerciseId,
           bodyWeightText: _bodyWeightController.text,
           bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
+          externalWeightText: _externalWeightController.text,
+          externalLoadCountText: _externalLoadCountController.text,
           addedWeightText: _addedWeightController.text,
           assistanceWeightText: _assistanceWeightController.text,
           repsText: _repsController.text,
@@ -474,6 +530,8 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
           exerciseId: exerciseId,
           bodyWeightText: _bodyWeightController.text,
           bodyWeightLoadRatio: _bodyWeightLoadRatioFor(exerciseId),
+          externalWeightText: _externalWeightController.text,
+          externalLoadCountText: _externalLoadCountController.text,
           addedWeightText: _addedWeightController.text,
           assistanceWeightText: _assistanceWeightController.text,
           repsText: _repsController.text,
@@ -507,6 +565,10 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
       _editingOrder = null;
       _exerciseId = duplicatedSet.exerciseId;
       _bodyWeightController.text = _weightText(duplicatedSet.bodyWeightKg);
+      _externalWeightController.text = _weightText(
+        duplicatedSet.externalWeightKg,
+      );
+      _externalLoadCountController.clear();
       _addedWeightController.text = duplicatedSet.addedWeightKg == 0
           ? ''
           : _weightText(duplicatedSet.addedWeightKg);
@@ -523,6 +585,8 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
       _editingOrder = set.order;
       _exerciseId = set.exerciseId;
       _bodyWeightController.text = _weightText(set.bodyWeightKg);
+      _externalWeightController.text = _weightText(set.externalWeightKg);
+      _externalLoadCountController.clear();
       _addedWeightController.text = set.addedWeightKg == 0
           ? ''
           : _weightText(set.addedWeightKg);
@@ -544,7 +608,11 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
         .bodyWeightLoadRatioFor(exerciseId);
   }
 
-  String _weightText(double value) {
+  String _weightText(double? value) {
+    if (value == null) {
+      return '';
+    }
+
     if (value == value.roundToDouble()) {
       return value.toStringAsFixed(0);
     }
@@ -556,6 +624,30 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     final exerciseId = _exerciseId;
     if (exerciseId == null) {
       return null;
+    }
+
+    if (_isExternalWeightExercise(exerciseId)) {
+      final externalWeight = double.tryParse(
+        _externalWeightController.text.trim(),
+      );
+      if (externalWeight == null) {
+        return null;
+      }
+
+      final countText = _externalLoadCountController.text.trim();
+      final numberOfLoads = countText.isEmpty ? 1 : int.tryParse(countText);
+      if (numberOfLoads == null) {
+        return null;
+      }
+
+      try {
+        return const ExternalWeightLoadCalculator().estimatedLoadKg(
+          externalWeightKg: externalWeight,
+          numberOfLoads: numberOfLoads,
+        );
+      } on ArgumentError {
+        return null;
+      }
     }
 
     final bodyWeight = double.tryParse(_bodyWeightController.text.trim());
@@ -629,5 +721,13 @@ class _WorkoutSetInputScreenState extends ConsumerState<WorkoutSetInputScreen> {
     } on ArgumentError {
       return null;
     }
+  }
+
+  bool _isExternalWeightExercise(String? exerciseId) {
+    return switch (exerciseId) {
+      null => false,
+      'push_up' => false,
+      _ => true,
+    };
   }
 }

@@ -38,6 +38,7 @@ class WorkoutSetDraft {
   const WorkoutSetDraft({
     this.order = 1,
     required this.exerciseId,
+    this.externalWeightKg,
     required this.bodyWeightKg,
     required this.bodyWeightLoadRatio,
     required this.addedWeightKg,
@@ -48,12 +49,24 @@ class WorkoutSetDraft {
 
   final int order;
   final String exerciseId;
-  final double bodyWeightKg;
-  final double bodyWeightLoadRatio;
+  final double? externalWeightKg;
+  final double? bodyWeightKg;
+  final double? bodyWeightLoadRatio;
   final double addedWeightKg;
   final double assistanceWeightKg;
   final int reps;
   final int rir;
+
+  double get estimatedLoadKg {
+    final externalWeight = externalWeightKg;
+    if (externalWeight != null) {
+      return externalWeight;
+    }
+
+    return (bodyWeightKg ?? 0) * (bodyWeightLoadRatio ?? 0) +
+        addedWeightKg -
+        assistanceWeightKg;
+  }
 }
 
 class WorkoutSessionDraft {
@@ -138,22 +151,18 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
       },
       'exercises': [
         {
-          'exerciseLogId': 'push_up-1',
+          'exerciseLogId': '${draft.exerciseId}-1',
           'exerciseId': draft.exerciseId,
           'displayName': _displayNameFor(draft.exerciseId),
-          'resistanceType': 'body_weight',
+          'resistanceType': _resistanceTypeFor(draft.exerciseId),
           'variation': 'standard',
-          'targetMuscles': [
-            {'muscleId': 'chest', 'allocation': 1.0},
-            {'muscleId': 'triceps', 'allocation': 0.5},
-            {'muscleId': 'front_deltoid', 'allocation': 0.5},
-          ],
+          'targetMuscles': _targetMusclesFor(draft.exerciseId),
           'sets': [
             for (final set in draft.sets)
               {
                 'setId': 'set-${set.order}',
                 'order': set.order,
-                'externalWeightKg': null,
+                'externalWeightKg': set.externalWeightKg,
                 'bodyWeightKg': set.bodyWeightKg,
                 'bodyWeightLoadRatio': set.bodyWeightLoadRatio,
                 'addedWeightKg': set.addedWeightKg,
@@ -184,7 +193,29 @@ class FirestoreWorkoutSetInputRepository implements WorkoutSetInputRepository {
   String _displayNameFor(String exerciseId) {
     return switch (exerciseId) {
       'push_up' => '腕立て伏せ',
+      'bench_press' => 'ベンチプレス',
+      'dumbbell_curl' => 'ダンベルカール',
       _ => exerciseId,
+    };
+  }
+
+  String _resistanceTypeFor(String exerciseId) {
+    return switch (exerciseId) {
+      'push_up' => 'body_weight',
+      _ => 'external_weight',
+    };
+  }
+
+  List<Map<String, Object?>> _targetMusclesFor(String exerciseId) {
+    return switch (exerciseId) {
+      'dumbbell_curl' => [
+        {'muscleId': 'biceps', 'allocation': 1.0},
+      ],
+      _ => [
+        {'muscleId': 'chest', 'allocation': 1.0},
+        {'muscleId': 'triceps', 'allocation': 0.5},
+        {'muscleId': 'front_deltoid', 'allocation': 0.5},
+      ],
     };
   }
 }
