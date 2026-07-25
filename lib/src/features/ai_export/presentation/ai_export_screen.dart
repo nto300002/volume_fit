@@ -9,6 +9,7 @@ import '../../workout/domain/bodyweight_load_calculator.dart';
 import '../../workout/domain/hard_set_judge.dart';
 import '../../workout/domain/rir_adjusted_volume_calculator.dart';
 import '../../workout/domain/set_volume_calculator.dart';
+import '../data/ai_export_history_repository.dart';
 import '../domain/ai_markdown_generator.dart';
 
 class AiExportScreen extends ConsumerStatefulWidget {
@@ -25,6 +26,9 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
   final _assistanceWeightController = TextEditingController();
   int? _rir;
   String? _markdown;
+  Map<String, Object?>? _calculationSnapshot;
+  bool _isSavingHistory = false;
+  String? _successMessage;
   String? _errorMessage;
 
   @override
@@ -140,6 +144,16 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
+                if (_successMessage != null) ...[
+                  Text(
+                    _successMessage!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 FilledButton(
                   key: const Key('aiGenerateMarkdownButton'),
                   onPressed: _generate,
@@ -163,6 +177,17 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
                       padding: const EdgeInsets.all(12),
                       child: SelectableText(_markdown!),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    key: const Key('aiSaveHistoryButton'),
+                    onPressed: _isSavingHistory ? null : _saveHistory,
+                    child: _isSavingHistory
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('履歴保存'),
                   ),
                 ],
               ],
@@ -226,6 +251,20 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
 
     setState(() {
       _errorMessage = null;
+      _successMessage = null;
+      _calculationSnapshot = {
+        'sets': [
+          {
+            'exerciseId': 'push_up',
+            'exerciseName': '腕立て伏せ',
+            'order': 1,
+            'estimatedLoadKg': estimatedLoad,
+            'setVolumeKg': setVolume,
+            'effortAdjustedVolumeKg': effortAdjustedVolume,
+            'isHardSet': isHardSet,
+          },
+        ],
+      };
       _markdown = const AiMarkdownGenerator().generate(
         AiMarkdownRequest(
           purpose: '今日の評価と次回メニュー作成',
@@ -258,6 +297,52 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
         ),
       );
     });
+  }
+
+  Future<void> _saveHistory() async {
+    final markdown = _markdown;
+    final calculationSnapshot = _calculationSnapshot;
+    if (markdown == null || calculationSnapshot == null) {
+      setState(() {
+        _successMessage = null;
+        _errorMessage = 'Markdownを生成してください';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSavingHistory = true;
+      _successMessage = null;
+      _errorMessage = null;
+    });
+
+    try {
+      await ref
+          .read(aiExportHistoryRepositoryProvider)
+          .saveHistory(
+            AiExportHistoryDraft(
+              targetSessionIds: const [],
+              referenceSessionId: null,
+              purpose: 'daily_review',
+              targetAiService: 'chatgpt',
+              markdownContent: markdown,
+              jsonContent: const {},
+              calculationVersion: 'standard-v1',
+              promptVersion: 'prompt-v1',
+              calculationSnapshot: calculationSnapshot,
+              customInstruction: null,
+            ),
+          );
+      setState(() {
+        _isSavingHistory = false;
+        _successMessage = 'AI出力履歴を保存しました';
+      });
+    } on AiExportHistoryFailure catch (error) {
+      setState(() {
+        _isSavingHistory = false;
+        _errorMessage = error.message;
+      });
+    }
   }
 
   double? _optionalWeight(String value) {
