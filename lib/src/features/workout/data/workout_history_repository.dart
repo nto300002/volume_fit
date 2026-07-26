@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'calculation_settings.dart';
 import 'workout_set_input_repository.dart';
 
 final workoutHistoryReaderProvider = Provider<WorkoutHistoryReader>(
@@ -11,6 +12,7 @@ final workoutHistoryRepositoryProvider = Provider<WorkoutHistoryRepository>(
   (ref) => FirestoreWorkoutHistoryRepository(
     currentAuthUserId: ref.watch(currentAuthUserIdProvider),
     reader: ref.watch(workoutHistoryReaderProvider),
+    calculationSettings: ref.watch(calculationSettingsProvider),
   ),
 );
 
@@ -22,10 +24,17 @@ abstract interface class WorkoutHistoryRepository {
     required DateTime to,
     int limit = 50,
   });
+
+  Future<WorkoutSessionDetail> fetchSessionDetail(String sessionId);
 }
 
 abstract interface class WorkoutHistoryReader {
   Future<List<WorkoutHistoryDocument>> fetch(WorkoutHistoryQuery query);
+
+  Future<WorkoutHistoryDocument?> fetchById({
+    required String ownerUserId,
+    required String sessionId,
+  });
 }
 
 class WorkoutHistoryQuery {
@@ -67,6 +76,45 @@ class WorkoutHistorySession {
   final double totalVolumeKg;
 }
 
+class WorkoutSessionDetail {
+  const WorkoutSessionDetail({
+    required this.id,
+    required this.completedAt,
+    required this.exercises,
+    required this.totalVolumeKg,
+  });
+
+  final String id;
+  final DateTime completedAt;
+  final List<WorkoutSessionDetailExercise> exercises;
+  final double totalVolumeKg;
+}
+
+class WorkoutSessionDetailExercise {
+  const WorkoutSessionDetailExercise({required this.name, required this.sets});
+
+  final String name;
+  final List<WorkoutSessionDetailSet> sets;
+}
+
+class WorkoutSessionDetailSet {
+  const WorkoutSessionDetailSet({
+    required this.order,
+    required this.reps,
+    required this.rir,
+    required this.estimatedLoadKg,
+    required this.setVolumeKg,
+    required this.effortAdjustedVolumeKg,
+  });
+
+  final int order;
+  final int reps;
+  final int? rir;
+  final double estimatedLoadKg;
+  final double setVolumeKg;
+  final double effortAdjustedVolumeKg;
+}
+
 class WorkoutHistoryFailure implements Exception {
   const WorkoutHistoryFailure(this.message);
 
@@ -77,10 +125,12 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
   const FirestoreWorkoutHistoryRepository({
     required this.currentAuthUserId,
     required this.reader,
+    required this.calculationSettings,
   });
 
   final String? currentAuthUserId;
   final WorkoutHistoryReader reader;
+  final CalculationSettings calculationSettings;
 
   @override
   Future<List<WorkoutHistorySession>> fetchRecent({int limit = 20}) async {
@@ -101,6 +151,28 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
         limit: limit,
       ),
     );
+  }
+
+  @override
+  Future<WorkoutSessionDetail> fetchSessionDetail(String sessionId) async {
+    final ownerUserId = _userId();
+    try {
+      final document = await reader.fetchById(
+        ownerUserId: ownerUserId,
+        sessionId: sessionId,
+      );
+      if (document == null || document.data['isDeleted'] == true) {
+        throw const WorkoutHistoryFailure('セッションが見つかりません');
+      }
+
+      return _detailFromDocument(document);
+    } on WorkoutHistoryFailure {
+      rethrow;
+    } on FirebaseException {
+      throw const WorkoutHistoryFailure('セッション詳細の取得に失敗しました');
+    } on Exception {
+      throw const WorkoutHistoryFailure('セッション詳細の取得に失敗しました');
+    }
   }
 
   Future<List<WorkoutHistorySession>> _fetch(WorkoutHistoryQuery query) async {
@@ -193,6 +265,57 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
     final assistance = (set['assistanceWeightKg'] as num?)?.toDouble() ?? 0;
     return bodyWeight * ratio + added - assistance;
   }
+
+  WorkoutSessionDetail _detailFromDocument(WorkoutHistoryDocument document) {
+    final data = document.data;
+    final exercises = (data['exercises'] as List<Object?>? ?? const [])
+        .whereType<Map<String, Object?>>()
+        .map(_detailExercise)
+        .toList();
+    final totalVolume = exercises.fold(0.0, (total, exercise) {
+      return total +
+          exercise.sets.fold(0.0, (exerciseTotal, set) {
+            return exerciseTotal + set.setVolumeKg;
+          });
+    });
+
+    return WorkoutSessionDetail(
+      id: document.id,
+      completedAt:
+          _dateTime(data['completedAt']) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+      exercises: exercises,
+      totalVolumeKg: totalVolume,
+    );
+  }
+
+  WorkoutSessionDetailExercise _detailExercise(Map<String, Object?> exercise) {
+    final sets = (exercise['sets'] as List<Object?>? ?? const [])
+        .whereType<Map<String, Object?>>()
+        .map(_detailSet)
+        .toList();
+
+    return WorkoutSessionDetailExercise(
+      name: exercise['displayName'] as String? ?? '未設定',
+      sets: sets,
+    );
+  }
+
+  WorkoutSessionDetailSet _detailSet(Map<String, Object?> set) {
+    final reps = (set['reps'] as num?)?.toInt() ?? 0;
+    final rir = (set['rir'] as num?)?.toInt();
+    final estimatedLoad = _estimatedLoadKg(set);
+    final setVolume = estimatedLoad * reps;
+    return WorkoutSessionDetailSet(
+      order: (set['order'] as num?)?.toInt() ?? 1,
+      reps: reps,
+      rir: rir,
+      estimatedLoadKg: estimatedLoad,
+      setVolumeKg: setVolume,
+      effortAdjustedVolumeKg:
+          setVolume * calculationSettings.rirMultiplierFor(rir),
+    );
+  }
 }
 
 class FirestoreWorkoutHistoryReader implements WorkoutHistoryReader {
@@ -234,5 +357,25 @@ class FirestoreWorkoutHistoryReader implements WorkoutHistoryReader {
       for (final document in snapshot.docs)
         WorkoutHistoryDocument(id: document.id, data: document.data()),
     ];
+  }
+
+  @override
+  Future<WorkoutHistoryDocument?> fetchById({
+    required String ownerUserId,
+    required String sessionId,
+  }) async {
+    final document = await _firestore
+        .collection('users')
+        .doc(ownerUserId)
+        .collection('workoutSessions')
+        .doc(sessionId)
+        .get();
+
+    final data = document.data();
+    if (!document.exists || data == null) {
+      return null;
+    }
+
+    return WorkoutHistoryDocument(id: document.id, data: data);
   }
 }

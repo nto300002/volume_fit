@@ -19,6 +19,7 @@ class AppRoutePaths {
   static const profile = '/profile';
   static const workout = '/workout';
   static const history = '/history';
+  static String historyDetail(String sessionId) => '/history/$sessionId';
   static const ai = '/ai';
   static const settings = '/settings';
 }
@@ -68,6 +69,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutePaths.history,
         builder: (context, state) => const WorkoutHistoryScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutePaths.history}/:sessionId',
+        builder: (context, state) => WorkoutSessionDetailScreen(
+          sessionId: state.pathParameters['sessionId'] ?? '',
+        ),
       ),
       GoRoute(
         path: AppRoutePaths.ai,

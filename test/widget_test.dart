@@ -325,6 +325,66 @@ void main() {
     expect(find.text('2セット'), findsOneWidget);
   });
 
+  testWidgets('opens workout session detail from history list', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          workoutHistoryRepositoryProvider.overrideWithValue(
+            _SuccessfulWorkoutHistoryRepository(
+              [
+                WorkoutHistorySession(
+                  id: 'session-1',
+                  completedAt: DateTime.utc(2026, 7, 25, 12),
+                  exerciseSummary: 'ベンチプレス',
+                  setCount: 1,
+                  totalVolumeKg: 600,
+                ),
+              ],
+              detail: WorkoutSessionDetail(
+                id: 'session-1',
+                completedAt: DateTime.utc(2026, 7, 25, 12),
+                exercises: const [
+                  WorkoutSessionDetailExercise(
+                    name: 'ベンチプレス',
+                    sets: [
+                      WorkoutSessionDetailSet(
+                        order: 1,
+                        reps: 10,
+                        rir: 2,
+                        estimatedLoadKg: 60,
+                        setVolumeKg: 600,
+                        effortAdjustedVolumeKg: 570,
+                      ),
+                    ],
+                  ),
+                ],
+                totalVolumeKg: 600,
+              ),
+            ),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('履歴を見る'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ベンチプレス'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('セッション詳細'), findsOneWidget);
+    expect(find.text('ベンチプレス'), findsOneWidget);
+    expect(find.text('セット 1'), findsOneWidget);
+    expect(find.text('推定負荷 60.0 kg'), findsOneWidget);
+    expect(find.text('セットボリューム 600.0 kg'), findsOneWidget);
+    expect(find.text('RIR補正 570.0 kg'), findsOneWidget);
+    expect(find.text('表示値は現在の計算設定による概算値です'), findsOneWidget);
+  });
+
   testWidgets('shows empty workout history state', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -978,9 +1038,10 @@ class _SuccessfulWorkoutSetInputRepository
 }
 
 class _SuccessfulWorkoutHistoryRepository implements WorkoutHistoryRepository {
-  const _SuccessfulWorkoutHistoryRepository(this.sessions);
+  const _SuccessfulWorkoutHistoryRepository(this.sessions, {this.detail});
 
   final List<WorkoutHistorySession> sessions;
+  final WorkoutSessionDetail? detail;
 
   @override
   Future<List<WorkoutHistorySession>> fetchRecent({int limit = 20}) async {
@@ -994,6 +1055,16 @@ class _SuccessfulWorkoutHistoryRepository implements WorkoutHistoryRepository {
     int limit = 50,
   }) async {
     return sessions;
+  }
+
+  @override
+  Future<WorkoutSessionDetail> fetchSessionDetail(String sessionId) async {
+    final detail = this.detail;
+    if (detail == null) {
+      throw const WorkoutHistoryFailure('セッションが見つかりません');
+    }
+
+    return detail;
   }
 }
 

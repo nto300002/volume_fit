@@ -104,36 +104,41 @@ class _HistoryList extends ConsumerWidget {
                       const SizedBox(height: 8),
                   itemBuilder: (context, index) {
                     final session = state.sessions[index];
-                    return DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              session.exerciseSummary,
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w700),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(_dateLabel(session.completedAt)),
-                            const SizedBox(height: 6),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text('${session.setCount}セット'),
-                                Text(
-                                  '${session.totalVolumeKg.toStringAsFixed(1)} kg',
-                                ),
-                              ],
-                            ),
-                          ],
+                    return InkWell(
+                      onTap: () =>
+                          context.go(AppRoutePaths.historyDetail(session.id)),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                session.exerciseSummary,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(_dateLabel(session.completedAt)),
+                              const SizedBox(height: 6),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text('${session.setCount}セット'),
+                                  Text(
+                                    '${session.totalVolumeKg.toStringAsFixed(1)} kg',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );
@@ -141,6 +146,120 @@ class _HistoryList extends ConsumerWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+class WorkoutSessionDetailScreen extends ConsumerWidget {
+  const WorkoutSessionDetailScreen({super.key, required this.sessionId});
+
+  final String sessionId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detail = ref.watch(workoutSessionDetailControllerProvider(sessionId));
+    final logout = ref.watch(logoutControllerProvider);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('セッション詳細'),
+        actions: [
+          TextButton(
+            onPressed: logout.isLoading
+                ? null
+                : () async {
+                    final succeeded = await ref
+                        .read(logoutControllerProvider.notifier)
+                        .logout();
+
+                    if (succeeded && context.mounted) {
+                      context.go(AppRoutePaths.login);
+                    }
+                  },
+            child: const Text('ログアウト'),
+          ),
+        ],
+      ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: detail.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (error, stackTrace) => _HistoryMessage(
+                message: error is WorkoutHistoryFailure
+                    ? error.message
+                    : 'セッション詳細の取得に失敗しました',
+              ),
+              data: (session) => ListView(
+                children: [
+                  Text(
+                    _dateLabel(session.completedAt),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '総ボリューム ${session.totalVolumeKg.toStringAsFixed(1)} kg',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('表示値は現在の計算設定による概算値です'),
+                  const SizedBox(height: 16),
+                  for (final exercise in session.exercises) ...[
+                    Text(
+                      exercise.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    for (final set in exercise.sets) ...[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'セット ${set.order}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text('${set.reps}回 / RIR ${set.rir ?? '-'}'),
+                              Text(
+                                '推定負荷 ${set.estimatedLoadKg.toStringAsFixed(1)} kg',
+                              ),
+                              Text(
+                                'セットボリューム ${set.setVolumeKg.toStringAsFixed(1)} kg',
+                              ),
+                              Text(
+                                'RIR補正 ${set.effortAdjustedVolumeKg.toStringAsFixed(1)} kg',
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

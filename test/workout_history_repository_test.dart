@@ -66,6 +66,85 @@ void main() {
     expect(reader.lastQuery?.limit, 50);
   });
 
+  test(
+    'loads a workout session detail by id and recalculates set values',
+    () async {
+      final reader = FakeWorkoutHistoryReader(
+        documents: [
+          WorkoutHistoryDocument(
+            id: 'session-1',
+            data: {
+              'completedAt': Timestamp.fromDate(DateTime.utc(2026, 7, 25, 12)),
+              'isDeleted': false,
+              'exercises': [
+                {
+                  'displayName': '腕立て伏せ',
+                  'sets': [
+                    {
+                      'order': 1,
+                      'reps': 12,
+                      'rir': 2,
+                      'bodyWeightKg': 80,
+                      'bodyWeightLoadRatio': 0.72,
+                      'addedWeightKg': 0,
+                      'assistanceWeightKg': 0,
+                    },
+                  ],
+                },
+              ],
+            },
+          ),
+        ],
+      );
+      final container = ProviderContainer(
+        overrides: [
+          currentAuthUserIdProvider.overrideWithValue('uid-1'),
+          workoutHistoryReaderProvider.overrideWithValue(reader),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final detail = await container
+          .read(workoutHistoryRepositoryProvider)
+          .fetchSessionDetail('session-1');
+
+      expect(reader.lastSessionId, 'session-1');
+      expect(detail.id, 'session-1');
+      expect(detail.exercises.single.name, '腕立て伏せ');
+      expect(
+        detail.exercises.single.sets.single.estimatedLoadKg,
+        closeTo(57.6, 0.001),
+      );
+      expect(
+        detail.exercises.single.sets.single.setVolumeKg,
+        closeTo(691.2, 0.001),
+      );
+      expect(
+        detail.exercises.single.sets.single.effortAdjustedVolumeKg,
+        closeTo(656.64, 0.001),
+      );
+      expect(detail.totalVolumeKg, closeTo(691.2, 0.001));
+    },
+  );
+
+  test('rejects missing session detail', () async {
+    final reader = FakeWorkoutHistoryReader(documents: []);
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutHistoryReaderProvider.overrideWithValue(reader),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    expect(
+      () => container
+          .read(workoutHistoryRepositoryProvider)
+          .fetchSessionDetail('missing'),
+      throwsA(isA<WorkoutHistoryFailure>()),
+    );
+  });
+
   test('rejects history load when auth user is missing', () async {
     final container = ProviderContainer(
       overrides: [
@@ -89,11 +168,24 @@ class FakeWorkoutHistoryReader implements WorkoutHistoryReader {
 
   final List<WorkoutHistoryDocument> documents;
   WorkoutHistoryQuery? lastQuery;
+  String? lastSessionId;
 
   @override
   Future<List<WorkoutHistoryDocument>> fetch(WorkoutHistoryQuery query) async {
     lastQuery = query;
     return documents;
+  }
+
+  @override
+  Future<WorkoutHistoryDocument?> fetchById({
+    required String ownerUserId,
+    required String sessionId,
+  }) async {
+    lastSessionId = sessionId;
+    return documents
+        .where((document) => document.id == sessionId)
+        .cast<WorkoutHistoryDocument?>()
+        .firstOrNull;
   }
 }
 

@@ -7,6 +7,13 @@ final workoutHistoryControllerProvider =
       WorkoutHistoryController.new,
     );
 
+final workoutSessionDetailControllerProvider =
+    FutureProvider.family<WorkoutSessionDetail, String>((ref, sessionId) {
+      return ref
+          .watch(workoutHistoryRepositoryProvider)
+          .fetchSessionDetail(sessionId);
+    });
+
 class WorkoutHistoryState {
   const WorkoutHistoryState({
     required this.sessions,
