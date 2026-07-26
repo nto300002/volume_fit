@@ -336,6 +336,76 @@ void main() {
     expect(find.text('保存済みです'), findsOneWidget);
   });
 
+  testWidgets('saves an external-weight set from workout input', (
+    WidgetTester tester,
+  ) async {
+    final repository = _SuccessfulWorkoutSetInputRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          workoutSetInputRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await _selectExercise(tester, 'ベンチプレス');
+    await tester.enterText(
+      find.byKey(const Key('workoutExternalWeightField')),
+      '60',
+    );
+    await tester.enterText(find.byKey(const Key('workoutRepsField')), '10');
+    await tester.tap(find.byKey(const Key('workoutRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 2').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('推定負荷（概算）'), findsOneWidget);
+    expect(find.text('60.0 kg'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('保存済みです'), findsOneWidget);
+    expect(repository.lastSessionDraft?.sets.single.exerciseId, 'bench_press');
+    expect(repository.lastSessionDraft?.sets.single.externalWeightKg, 60);
+  });
+
+  testWidgets('shows total dumbbell load from per-side load and count', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [isAuthenticatedProvider.overrideWithValue(true)],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('トレーニングを開始'));
+    await tester.pumpAndSettle();
+    await _selectExercise(tester, 'ダンベルカール');
+    await tester.enterText(
+      find.byKey(const Key('workoutExternalWeightField')),
+      '22.5',
+    );
+    await tester.enterText(
+      find.byKey(const Key('workoutExternalLoadCountField')),
+      '2',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('推定負荷（概算）'), findsOneWidget);
+    expect(find.text('45.0 kg'), findsOneWidget);
+  });
+
   testWidgets('adds edits and saves multiple workout sets', (
     WidgetTester tester,
   ) async {
@@ -832,6 +902,10 @@ class _SuccessfulWorkoutSetInputRepository
 
   @override
   Future<WorkoutSetSaveResult> saveDraftSet(WorkoutSetDraft draft) async {
+    lastSessionDraft = WorkoutSessionDraft(
+      exerciseId: draft.exerciseId,
+      sets: [draft],
+    );
     return WorkoutSetSaveResult.saved;
   }
 
@@ -902,9 +976,13 @@ Future<void> _saveOnePushUpSet(WidgetTester tester) async {
 }
 
 Future<void> _selectPushUp(WidgetTester tester) async {
+  await _selectExercise(tester, '腕立て伏せ');
+}
+
+Future<void> _selectExercise(WidgetTester tester, String label) async {
   await tester.tap(find.byKey(const Key('workoutExerciseDropdown')));
   await tester.pumpAndSettle();
-  await tester.tap(find.text('腕立て伏せ').last);
+  await tester.tap(find.text(label).last);
   await tester.pumpAndSettle();
 }
 

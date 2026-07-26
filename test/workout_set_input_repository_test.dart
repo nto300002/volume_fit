@@ -97,6 +97,88 @@ void main() {
     );
   });
 
+  test('saves an external-weight exercise payload', () async {
+    final writer = FakeWorkoutSessionWriter();
+    final now = DateTime.utc(2026, 7, 25, 2, 3, 4);
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutSessionWriterProvider.overrideWithValue(writer),
+        clockProvider.overrideWithValue(() => now),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(workoutSetInputRepositoryProvider)
+        .saveDraftSet(
+          const WorkoutSetDraft(
+            exerciseId: 'bench_press',
+            externalWeightKg: 60,
+            bodyWeightKg: null,
+            bodyWeightLoadRatio: null,
+            addedWeightKg: 0,
+            assistanceWeightKg: 0,
+            reps: 10,
+            rir: 2,
+          ),
+        );
+
+    final data = writer.data;
+    expect(data?['exerciseIds'], ['bench_press']);
+    final condition = data?['condition'] as Map<String, Object?>;
+    expect(condition['bodyWeightKg'], isNull);
+
+    final exercises = data?['exercises'] as List<Object?>;
+    final exercise = exercises.single as Map<String, Object?>;
+    expect(exercise['exerciseId'], 'bench_press');
+    expect(exercise['displayName'], 'ベンチプレス');
+    expect(exercise['resistanceType'], 'external_weight');
+
+    final sets = exercise['sets'] as List<Object?>;
+    final set = sets.single as Map<String, Object?>;
+    expect(set['externalWeightKg'], 60);
+    expect(set['bodyWeightKg'], isNull);
+    expect(set['bodyWeightLoadRatio'], isNull);
+  });
+
+  test('saves a dumbbell exercise as total external load', () async {
+    final writer = FakeWorkoutSessionWriter();
+    final now = DateTime.utc(2026, 7, 25, 2, 3, 4);
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutSessionWriterProvider.overrideWithValue(writer),
+        clockProvider.overrideWithValue(() => now),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container
+        .read(workoutSetInputRepositoryProvider)
+        .saveDraftSet(
+          const WorkoutSetDraft(
+            exerciseId: 'dumbbell_curl',
+            externalWeightKg: 45,
+            bodyWeightKg: null,
+            bodyWeightLoadRatio: null,
+            addedWeightKg: 0,
+            assistanceWeightKg: 0,
+            reps: 8,
+            rir: 1,
+          ),
+        );
+
+    final exercises = writer.data?['exercises'] as List<Object?>;
+    final exercise = exercises.single as Map<String, Object?>;
+    final sets = exercise['sets'] as List<Object?>;
+    final set = sets.single as Map<String, Object?>;
+    expect(exercise['exerciseId'], 'dumbbell_curl');
+    expect(exercise['displayName'], 'ダンベルカール');
+    expect(exercise['resistanceType'], 'external_weight');
+    expect(set['externalWeightKg'], 45);
+  });
+
   test('saves multiple sets with stable ids and order', () async {
     final writer = FakeWorkoutSessionWriter();
     final now = DateTime.utc(2026, 7, 25, 1, 2, 3);

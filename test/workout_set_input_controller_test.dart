@@ -78,6 +78,111 @@ void main() {
     );
   });
 
+  test('saves an external-weight set without bodyweight load ratio', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final succeeded = await container
+        .read(workoutSetInputControllerProvider.notifier)
+        .saveSet(
+          exerciseId: 'bench_press',
+          externalWeightText: '60',
+          repsText: '10',
+          rir: 2,
+        );
+
+    expect(succeeded, isTrue);
+    expect(repository.saveCallCount, 1);
+    expect(repository.lastDraft?.exerciseId, 'bench_press');
+    expect(repository.lastDraft?.externalWeightKg, 60);
+    expect(repository.lastDraft?.bodyWeightKg, isNull);
+    expect(repository.lastDraft?.bodyWeightLoadRatio, isNull);
+    expect(repository.lastDraft?.reps, 10);
+    expect(repository.lastDraft?.rir, 2);
+  });
+
+  test('saves a dumbbell set as total external load', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final succeeded = await container
+        .read(workoutSetInputControllerProvider.notifier)
+        .saveSet(
+          exerciseId: 'dumbbell_curl',
+          externalWeightText: '22.5',
+          externalLoadCountText: '2',
+          repsText: '8',
+          rir: 1,
+        );
+
+    expect(succeeded, isTrue);
+    expect(repository.lastDraft?.externalWeightKg, 45);
+    expect(
+      container.read(workoutSetInputControllerProvider).value?.sessionVolumeKg,
+      0,
+    );
+  });
+
+  test('adds an external-weight set and aggregates session volume', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final added = container
+        .read(workoutSetInputControllerProvider.notifier)
+        .addSet(
+          exerciseId: 'bench_press',
+          externalWeightText: '60',
+          repsText: '10',
+          rir: 2,
+        );
+
+    final state = container.read(workoutSetInputControllerProvider).value;
+    expect(added, isTrue);
+    expect(state?.sets.single.externalWeightKg, 60);
+    expect(state?.sessionVolumeKg, 600);
+  });
+
+  test('rejects invalid external weight before saving', () async {
+    final repository = FakeWorkoutSetInputRepository();
+    final container = ProviderContainer(
+      overrides: [
+        workoutSetInputRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final succeeded = await container
+        .read(workoutSetInputControllerProvider.notifier)
+        .saveSet(
+          exerciseId: 'bench_press',
+          externalWeightText: '0',
+          repsText: '10',
+          rir: 2,
+        );
+
+    expect(succeeded, isFalse);
+    expect(repository.saveCallCount, 0);
+    expect(
+      container.read(workoutSetInputControllerProvider).value?.errorMessage,
+      '重量は0より大きい値で入力してください',
+    );
+  });
+
   test('shows pending status after a queued save', () async {
     final repository = FakeWorkoutSetInputRepository(
       result: WorkoutSetSaveResult.pending,
@@ -308,6 +413,7 @@ void main() {
     expect(state?.sets.map((set) => set.rir), [2, 2]);
     expect(state?.sets.last.bodyWeightKg, 80);
     expect(state?.sets.last.bodyWeightLoadRatio, 0.72);
+    expect(state?.sets.last.externalWeightKg, isNull);
     expect(state?.sets.last.addedWeightKg, 5);
     expect(state?.sets.last.assistanceWeightKg, 2);
   });

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/workout_set_input_repository.dart';
+import '../domain/external_weight_load_calculator.dart';
 
 final workoutSetInputControllerProvider =
     AsyncNotifierProvider<WorkoutSetInputController, WorkoutSetInputState>(
@@ -44,11 +45,7 @@ class WorkoutSetInputState {
 
   double get sessionVolumeKg {
     return sets.fold(0, (sum, set) {
-      final estimatedLoad =
-          set.bodyWeightKg * set.bodyWeightLoadRatio +
-          set.addedWeightKg -
-          set.assistanceWeightKg;
-      return sum + estimatedLoad * set.reps;
+      return sum + set.estimatedLoadKg * set.reps;
     });
   }
 }
@@ -58,6 +55,8 @@ class WorkoutSetInputDraft {
     this.exerciseId,
     this.bodyWeightText = '',
     this.bodyWeightLoadRatio,
+    this.externalWeightText = '',
+    this.externalLoadCountText = '',
     this.addedWeightText = '',
     this.assistanceWeightText = '',
     this.repsText = '',
@@ -67,6 +66,8 @@ class WorkoutSetInputDraft {
   final String? exerciseId;
   final String bodyWeightText;
   final double? bodyWeightLoadRatio;
+  final String externalWeightText;
+  final String externalLoadCountText;
   final String addedWeightText;
   final String assistanceWeightText;
   final String repsText;
@@ -81,6 +82,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     String? exerciseId,
     String? bodyWeightText,
     double? bodyWeightLoadRatio,
+    String? externalWeightText,
+    String? externalLoadCountText,
     String? addedWeightText,
     String? assistanceWeightText,
     required String repsText,
@@ -90,6 +93,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       exerciseId: exerciseId,
       bodyWeightText: bodyWeightText ?? '',
       bodyWeightLoadRatio: bodyWeightLoadRatio,
+      externalWeightText: externalWeightText ?? '',
+      externalLoadCountText: externalLoadCountText ?? '',
       addedWeightText: addedWeightText ?? '',
       assistanceWeightText: assistanceWeightText ?? '',
       repsText: repsText,
@@ -142,6 +147,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     String? exerciseId,
     String? bodyWeightText,
     double? bodyWeightLoadRatio,
+    String? externalWeightText,
+    String? externalLoadCountText,
     String? addedWeightText,
     String? assistanceWeightText,
     required String repsText,
@@ -152,6 +159,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       exerciseId: exerciseId,
       bodyWeightText: bodyWeightText ?? '',
       bodyWeightLoadRatio: bodyWeightLoadRatio,
+      externalWeightText: externalWeightText ?? '',
+      externalLoadCountText: externalLoadCountText ?? '',
       addedWeightText: addedWeightText ?? '',
       assistanceWeightText: assistanceWeightText ?? '',
       repsText: repsText,
@@ -177,6 +186,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     String? exerciseId,
     String? bodyWeightText,
     double? bodyWeightLoadRatio,
+    String? externalWeightText,
+    String? externalLoadCountText,
     String? addedWeightText,
     String? assistanceWeightText,
     required String repsText,
@@ -187,6 +198,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       exerciseId: exerciseId,
       bodyWeightText: bodyWeightText ?? '',
       bodyWeightLoadRatio: bodyWeightLoadRatio,
+      externalWeightText: externalWeightText ?? '',
+      externalLoadCountText: externalLoadCountText ?? '',
       addedWeightText: addedWeightText ?? '',
       assistanceWeightText: assistanceWeightText ?? '',
       repsText: repsText,
@@ -230,6 +243,7 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     final duplicated = WorkoutSetDraft(
       order: currentState.sets.length + 1,
       exerciseId: latest.exerciseId,
+      externalWeightKg: latest.externalWeightKg,
       bodyWeightKg: latest.bodyWeightKg,
       bodyWeightLoadRatio: latest.bodyWeightLoadRatio,
       addedWeightKg: latest.addedWeightKg,
@@ -242,8 +256,11 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       WorkoutSetInputState(
         draft: WorkoutSetInputDraft(
           exerciseId: duplicated.exerciseId,
-          bodyWeightText: _textForWeight(duplicated.bodyWeightKg),
+          bodyWeightText: _textForNullableWeight(duplicated.bodyWeightKg),
           bodyWeightLoadRatio: duplicated.bodyWeightLoadRatio,
+          externalWeightText: _textForNullableWeight(
+            duplicated.externalWeightKg,
+          ),
           addedWeightText: _optionalTextForWeight(duplicated.addedWeightKg),
           assistanceWeightText: _optionalTextForWeight(
             duplicated.assistanceWeightKg,
@@ -264,6 +281,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
         exerciseId: currentState.draft.exerciseId,
         bodyWeightText: currentState.draft.bodyWeightText,
         bodyWeightLoadRatio: currentState.draft.bodyWeightLoadRatio,
+        externalWeightText: currentState.draft.externalWeightText,
+        externalLoadCountText: currentState.draft.externalLoadCountText,
         addedWeightText: currentState.draft.addedWeightText,
         assistanceWeightText: currentState.draft.assistanceWeightText,
         repsText: currentState.draft.repsText,
@@ -319,6 +338,8 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       exerciseId: draft.exerciseId,
       bodyWeightText: draft.bodyWeightText,
       bodyWeightLoadRatio: draft.bodyWeightLoadRatio,
+      externalWeightText: draft.externalWeightText,
+      externalLoadCountText: draft.externalLoadCountText,
       addedWeightText: draft.addedWeightText,
       assistanceWeightText: draft.assistanceWeightText,
       repsText: draft.repsText,
@@ -347,28 +368,29 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
       return null;
     }
 
-    final bodyWeight = double.tryParse(draft.bodyWeightText.trim());
-    if (bodyWeight == null) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '体重を入力してください'),
-      );
-      return null;
-    }
-
-    if (bodyWeight <= 0 || bodyWeight > 500) {
-      state = AsyncData(
-        WorkoutSetInputState(draft: draft, errorMessage: '体重は0より大きい値で入力してください'),
-      );
-      return null;
-    }
-
     final selectedBodyWeightLoadRatio = bodyWeightLoadRatio;
-    if (selectedBodyWeightLoadRatio == null ||
-        selectedBodyWeightLoadRatio < 0 ||
-        selectedBodyWeightLoadRatio > 1) {
+    final isBodyWeightExercise = !_isExternalWeightExercise(selectedExerciseId);
+    final bodyWeight = isBodyWeightExercise
+        ? _validatedBodyWeight(draft)
+        : null;
+    if (isBodyWeightExercise && bodyWeight == null) {
+      return null;
+    }
+
+    if (isBodyWeightExercise &&
+        (selectedBodyWeightLoadRatio == null ||
+            selectedBodyWeightLoadRatio < 0 ||
+            selectedBodyWeightLoadRatio > 1)) {
       state = AsyncData(
         WorkoutSetInputState(draft: draft, errorMessage: '自重負荷係数を確認してください'),
       );
+      return null;
+    }
+
+    final externalWeight = isBodyWeightExercise
+        ? null
+        : _validatedExternalWeight(draft);
+    if (!isBodyWeightExercise && externalWeight == null) {
       return null;
     }
 
@@ -406,8 +428,11 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     return WorkoutSetDraft(
       order: order,
       exerciseId: selectedExerciseId,
+      externalWeightKg: externalWeight,
       bodyWeightKg: bodyWeight,
-      bodyWeightLoadRatio: selectedBodyWeightLoadRatio,
+      bodyWeightLoadRatio: isBodyWeightExercise
+          ? selectedBodyWeightLoadRatio
+          : null,
       addedWeightKg: addedWeight,
       assistanceWeightKg: assistanceWeight,
       reps: reps,
@@ -438,6 +463,63 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
     return parsed;
   }
 
+  double? _validatedBodyWeight(WorkoutSetInputDraft draft) {
+    final bodyWeight = double.tryParse(draft.bodyWeightText.trim());
+    if (bodyWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重を入力してください'),
+      );
+      return null;
+    }
+
+    if (bodyWeight <= 0 || bodyWeight > 500) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '体重は0より大きい値で入力してください'),
+      );
+      return null;
+    }
+
+    return bodyWeight;
+  }
+
+  double? _validatedExternalWeight(WorkoutSetInputDraft draft) {
+    final externalWeight = double.tryParse(draft.externalWeightText.trim());
+    if (externalWeight == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '重量を入力してください'),
+      );
+      return null;
+    }
+
+    final loadCountText = draft.externalLoadCountText.trim();
+    final loadCount = loadCountText.isEmpty ? 1 : int.tryParse(loadCountText);
+    if (loadCount == null) {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '重量の個数を確認してください'),
+      );
+      return null;
+    }
+
+    try {
+      return const ExternalWeightLoadCalculator().estimatedLoadKg(
+        externalWeightKg: externalWeight,
+        numberOfLoads: loadCount,
+      );
+    } on ArgumentError {
+      state = AsyncData(
+        WorkoutSetInputState(draft: draft, errorMessage: '重量は0より大きい値で入力してください'),
+      );
+      return null;
+    }
+  }
+
+  bool _isExternalWeightExercise(String exerciseId) {
+    return switch (exerciseId) {
+      'push_up' => false,
+      _ => true,
+    };
+  }
+
   String _textForWeight(double value) {
     if (value == value.roundToDouble()) {
       return value.toStringAsFixed(0);
@@ -448,6 +530,14 @@ class WorkoutSetInputController extends AsyncNotifier<WorkoutSetInputState> {
 
   String _optionalTextForWeight(double value) {
     if (value == 0) {
+      return '';
+    }
+
+    return _textForWeight(value);
+  }
+
+  String _textForNullableWeight(double? value) {
+    if (value == null) {
       return '';
     }
 
