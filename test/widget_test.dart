@@ -10,6 +10,7 @@ import 'package:volume_fit/src/features/ai_export/data/ai_export_history_reposit
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
 import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
+import 'package:volume_fit/src/features/workout/data/workout_history_repository.dart';
 import 'package:volume_fit/src/features/workout/data/workout_set_input_repository.dart';
 
 void main() {
@@ -280,6 +281,66 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('履歴'), findsWidgets);
+  });
+
+  testWidgets('opens workout history from home and shows recent sessions', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          workoutHistoryRepositoryProvider.overrideWithValue(
+            _SuccessfulWorkoutHistoryRepository([
+              WorkoutHistorySession(
+                id: 'session-1',
+                completedAt: DateTime.utc(2026, 7, 25, 12),
+                exerciseSummary: 'ベンチプレス',
+                setCount: 1,
+                totalVolumeKg: 600,
+              ),
+              WorkoutHistorySession(
+                id: 'session-2',
+                completedAt: DateTime.utc(2026, 7, 24, 12),
+                exerciseSummary: '腕立て伏せ',
+                setCount: 2,
+                totalVolumeKg: 1267.2,
+              ),
+            ]),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('履歴を見る'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('履歴'), findsWidgets);
+    expect(find.text('ベンチプレス'), findsOneWidget);
+    expect(find.text('1セット'), findsOneWidget);
+    expect(find.text('600.0 kg'), findsOneWidget);
+    expect(find.text('腕立て伏せ'), findsOneWidget);
+    expect(find.text('2セット'), findsOneWidget);
+  });
+
+  testWidgets('shows empty workout history state', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          initialLocationProvider.overrideWithValue(AppRoutePaths.history),
+          workoutHistoryRepositoryProvider.overrideWithValue(
+            _SuccessfulWorkoutHistoryRepository([]),
+          ),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('まだ記録がありません'), findsOneWidget);
   });
 
   testWidgets('saves initial profile and moves to home', (
@@ -913,6 +974,26 @@ class _SuccessfulWorkoutSetInputRepository
   Future<WorkoutSetSaveResult> saveSession(WorkoutSessionDraft draft) async {
     lastSessionDraft = draft;
     return WorkoutSetSaveResult.saved;
+  }
+}
+
+class _SuccessfulWorkoutHistoryRepository implements WorkoutHistoryRepository {
+  const _SuccessfulWorkoutHistoryRepository(this.sessions);
+
+  final List<WorkoutHistorySession> sessions;
+
+  @override
+  Future<List<WorkoutHistorySession>> fetchRecent({int limit = 20}) async {
+    return sessions;
+  }
+
+  @override
+  Future<List<WorkoutHistorySession>> fetchByCompletedAt({
+    required DateTime from,
+    required DateTime to,
+    int limit = 50,
+  }) async {
+    return sessions;
   }
 }
 
