@@ -82,12 +82,36 @@ class WorkoutSessionDetail {
     required this.completedAt,
     required this.exercises,
     required this.totalVolumeKg,
+    this.effortAdjustedVolumeKg = 0,
+    this.hardSetCount = 0,
+    this.targetMuscleIds = const {},
+    this.previousComparison,
   });
 
   final String id;
   final DateTime completedAt;
   final List<WorkoutSessionDetailExercise> exercises;
   final double totalVolumeKg;
+  final double effortAdjustedVolumeKg;
+  final int hardSetCount;
+  final Set<String> targetMuscleIds;
+  final WorkoutSessionComparison? previousComparison;
+}
+
+class WorkoutSessionComparison {
+  const WorkoutSessionComparison({
+    required this.label,
+    required this.estimatedVolumeDeltaKg,
+    required this.effortAdjustedVolumeDeltaKg,
+    required this.hardSetDelta,
+    required this.targetMuscleMatchRatio,
+  });
+
+  final String label;
+  final double estimatedVolumeDeltaKg;
+  final double effortAdjustedVolumeDeltaKg;
+  final int hardSetDelta;
+  final double targetMuscleMatchRatio;
 }
 
 class WorkoutSessionDetailExercise {
@@ -165,7 +189,19 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
         throw const WorkoutHistoryFailure('セッションが見つかりません');
       }
 
-      return _detailFromDocument(document);
+      final currentDetail = _detailFromDocument(document);
+      final previousDetail = await _previousDetailFor(
+        ownerUserId: ownerUserId,
+        currentDocument: document,
+        currentDetail: currentDetail,
+      );
+
+      return _detailFromDocument(
+        document,
+        previousComparison: previousDetail == null
+            ? null
+            : _comparison(current: currentDetail, previous: previousDetail),
+      );
     } on WorkoutHistoryFailure {
       rethrow;
     } on FirebaseException {
@@ -266,7 +302,68 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
     return bodyWeight * ratio + added - assistance;
   }
 
-  WorkoutSessionDetail _detailFromDocument(WorkoutHistoryDocument document) {
+  Future<WorkoutSessionDetail?> _previousDetailFor({
+    required String ownerUserId,
+    required WorkoutHistoryDocument currentDocument,
+    required WorkoutSessionDetail currentDetail,
+  }) async {
+    final documents = await reader.fetch(
+      WorkoutHistoryQuery(
+        ownerUserId: ownerUserId,
+        to: currentDetail.completedAt,
+        limit: 20,
+      ),
+    );
+    final previousDocuments =
+        documents
+            .where((document) => document.id != currentDocument.id)
+            .where((document) => document.data['isDeleted'] != true)
+            .map(_detailFromDocument)
+            .where(
+              (detail) =>
+                  detail.completedAt.isBefore(currentDetail.completedAt),
+            )
+            .toList()
+          ..sort((a, b) => b.completedAt.compareTo(a.completedAt));
+
+    return previousDocuments.firstOrNull;
+  }
+
+  WorkoutSessionComparison _comparison({
+    required WorkoutSessionDetail current,
+    required WorkoutSessionDetail previous,
+  }) {
+    return WorkoutSessionComparison(
+      label: '前回比',
+      estimatedVolumeDeltaKg: current.totalVolumeKg - previous.totalVolumeKg,
+      effortAdjustedVolumeDeltaKg:
+          current.effortAdjustedVolumeKg - previous.effortAdjustedVolumeKg,
+      hardSetDelta: current.hardSetCount - previous.hardSetCount,
+      targetMuscleMatchRatio: _targetMuscleMatchRatio(
+        current.targetMuscleIds,
+        previous.targetMuscleIds,
+      ),
+    );
+  }
+
+  double _targetMuscleMatchRatio(Set<String> current, Set<String> previous) {
+    if (current.isEmpty && previous.isEmpty) {
+      return 1;
+    }
+
+    final union = {...current, ...previous};
+    if (union.isEmpty) {
+      return 0;
+    }
+
+    final intersection = current.intersection(previous);
+    return intersection.length / union.length;
+  }
+
+  WorkoutSessionDetail _detailFromDocument(
+    WorkoutHistoryDocument document, {
+    WorkoutSessionComparison? previousComparison,
+  }) {
     final data = document.data;
     final exercises = (data['exercises'] as List<Object?>? ?? const [])
         .whereType<Map<String, Object?>>()
@@ -278,6 +375,12 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
             return exerciseTotal + set.setVolumeKg;
           });
     });
+    final effortAdjustedVolume = exercises.fold(0.0, (total, exercise) {
+      return total +
+          exercise.sets.fold(0.0, (exerciseTotal, set) {
+            return exerciseTotal + set.effortAdjustedVolumeKg;
+          });
+    });
 
     return WorkoutSessionDetail(
       id: document.id,
@@ -286,6 +389,15 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
           DateTime.fromMillisecondsSinceEpoch(0),
       exercises: exercises,
       totalVolumeKg: totalVolume,
+      effortAdjustedVolumeKg: effortAdjustedVolume,
+      hardSetCount: exercises.fold(0, (total, exercise) {
+        return total +
+            exercise.sets
+                .where((set) => set.rir != null && set.rir! <= 4)
+                .length;
+      }),
+      targetMuscleIds: _targetMuscleIds(exercises: data['exercises']),
+      previousComparison: previousComparison,
     );
   }
 
@@ -315,6 +427,18 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
       effortAdjustedVolumeKg:
           setVolume * calculationSettings.rirMultiplierFor(rir),
     );
+  }
+
+  Set<String> _targetMuscleIds({required Object? exercises}) {
+    return (exercises as List<Object?>? ?? const [])
+        .whereType<Map<String, Object?>>()
+        .expand(
+          (exercise) => exercise['targetMuscles'] as List<Object?>? ?? const [],
+        )
+        .whereType<Map<String, Object?>>()
+        .map((muscle) => muscle['muscleId'])
+        .whereType<String>()
+        .toSet();
   }
 }
 

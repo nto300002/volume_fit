@@ -346,6 +346,13 @@ void main() {
               detail: WorkoutSessionDetail(
                 id: 'session-1',
                 completedAt: DateTime.utc(2026, 7, 25, 12),
+                previousComparison: const WorkoutSessionComparison(
+                  label: '前回比',
+                  estimatedVolumeDeltaKg: 100,
+                  effortAdjustedVolumeDeltaKg: 320,
+                  hardSetDelta: 1,
+                  targetMuscleMatchRatio: 1 / 3,
+                ),
                 exercises: const [
                   WorkoutSessionDetailExercise(
                     name: 'ベンチプレス',
@@ -382,6 +389,11 @@ void main() {
     expect(find.text('推定負荷 60.0 kg'), findsOneWidget);
     expect(find.text('セットボリューム 600.0 kg'), findsOneWidget);
     expect(find.text('RIR補正 570.0 kg'), findsOneWidget);
+    expect(find.text('前回比'), findsOneWidget);
+    expect(find.text('推定ボリューム +100.0 kg'), findsOneWidget);
+    expect(find.text('RIR補正 +320.0 kg'), findsOneWidget);
+    expect(find.text('ハードセット +1'), findsOneWidget);
+    expect(find.text('対象筋一致度 33%'), findsOneWidget);
     expect(find.text('表示値は現在の計算設定による概算値です'), findsOneWidget);
   });
 
