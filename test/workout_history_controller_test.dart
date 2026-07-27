@@ -52,15 +52,58 @@ void main() {
     expect(state?.periodFrom, from);
     expect(state?.periodTo, to);
   });
+
+  test('loads selected workout session detail', () async {
+    final detail = WorkoutSessionDetail(
+      id: 'session-1',
+      completedAt: DateTime.utc(2026, 7, 25, 12),
+      exercises: [
+        WorkoutSessionDetailExercise(
+          name: 'ベンチプレス',
+          sets: [
+            WorkoutSessionDetailSet(
+              order: 1,
+              reps: 10,
+              rir: 2,
+              estimatedLoadKg: 60,
+              setVolumeKg: 600,
+              effortAdjustedVolumeKg: 570,
+            ),
+          ],
+        ),
+      ],
+      totalVolumeKg: 600,
+    );
+    final repository = FakeWorkoutHistoryRepository(
+      sessions: [],
+      detail: detail,
+    );
+    final container = ProviderContainer(
+      overrides: [
+        workoutHistoryRepositoryProvider.overrideWithValue(repository),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final loaded = await container.read(
+      workoutSessionDetailControllerProvider('session-1').future,
+    );
+
+    expect(repository.lastSessionId, 'session-1');
+    expect(loaded.exercises.single.name, 'ベンチプレス');
+    expect(loaded.totalVolumeKg, 600);
+  });
 }
 
 class FakeWorkoutHistoryRepository implements WorkoutHistoryRepository {
-  FakeWorkoutHistoryRepository({required this.sessions});
+  FakeWorkoutHistoryRepository({required this.sessions, this.detail});
 
   final List<WorkoutHistorySession> sessions;
+  final WorkoutSessionDetail? detail;
   int fetchRecentCallCount = 0;
   DateTime? lastFrom;
   DateTime? lastTo;
+  String? lastSessionId;
 
   @override
   Future<List<WorkoutHistorySession>> fetchRecent({int limit = 20}) async {
@@ -77,5 +120,16 @@ class FakeWorkoutHistoryRepository implements WorkoutHistoryRepository {
     lastFrom = from;
     lastTo = to;
     return sessions;
+  }
+
+  @override
+  Future<WorkoutSessionDetail> fetchSessionDetail(String sessionId) async {
+    lastSessionId = sessionId;
+    final detail = this.detail;
+    if (detail == null) {
+      throw const WorkoutHistoryFailure('セッションが見つかりません');
+    }
+
+    return detail;
   }
 }
