@@ -207,6 +207,10 @@ class WorkoutSessionDetailScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   const Text('表示値は現在の計算設定による概算値です'),
+                  if (session.previousComparison != null) ...[
+                    const SizedBox(height: 16),
+                    _ComparisonPanel(comparison: session.previousComparison!),
+                  ],
                   const SizedBox(height: 16),
                   for (final exercise in session.exercises) ...[
                     Text(
@@ -264,6 +268,62 @@ class WorkoutSessionDetailScreen extends ConsumerWidget {
   }
 }
 
+class _ComparisonPanel extends StatelessWidget {
+  const _ComparisonPanel({required this.comparison});
+
+  final WorkoutSessionComparison comparison;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              comparison.label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '推定ボリューム ${_signedKg(comparison.estimatedVolumeDeltaKg)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            Text(
+              'RIR補正 ${_signedKg(comparison.effortAdjustedVolumeDeltaKg)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            Text(
+              'ハードセット ${_signedInt(comparison.hardSetDelta)}',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+            Text(
+              '対象筋一致度 ${(comparison.targetMuscleMatchRatio * 100).round()}%',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HistoryMessage extends StatelessWidget {
   const _HistoryMessage({required this.message});
 
@@ -286,3 +346,13 @@ String _dateLabel(DateTime date) {
 }
 
 String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+String _signedKg(double value) {
+  final sign = value >= 0 ? '+' : '';
+  return '$sign${value.toStringAsFixed(1)} kg';
+}
+
+String _signedInt(int value) {
+  final sign = value >= 0 ? '+' : '';
+  return '$sign$value';
+}

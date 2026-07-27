@@ -127,6 +127,52 @@ void main() {
     },
   );
 
+  test('compares a workout session detail with the previous record', () async {
+    final currentDate = DateTime.utc(2026, 7, 25, 12);
+    final previousDate = DateTime.utc(2026, 7, 18, 12);
+    final reader = FakeWorkoutHistoryReader(
+      documents: [
+        _comparisonDocument(
+          id: 'current',
+          completedAt: currentDate,
+          exerciseName: 'ベンチプレス',
+          loadKg: 60,
+          reps: 10,
+          rir: 2,
+          targetMuscleIds: ['chest', 'triceps'],
+        ),
+        _comparisonDocument(
+          id: 'previous',
+          completedAt: previousDate,
+          exerciseName: 'ベンチプレス',
+          loadKg: 50,
+          reps: 10,
+          rir: 5,
+          targetMuscleIds: ['chest', 'front_deltoid'],
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutHistoryReaderProvider.overrideWithValue(reader),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final detail = await container
+        .read(workoutHistoryRepositoryProvider)
+        .fetchSessionDetail('current');
+
+    final comparison = detail.previousComparison;
+    expect(comparison, isNotNull);
+    expect(comparison?.label, '前回比');
+    expect(comparison?.estimatedVolumeDeltaKg, 100);
+    expect(comparison?.effortAdjustedVolumeDeltaKg, 320);
+    expect(comparison?.hardSetDelta, 1);
+    expect(comparison?.targetMuscleMatchRatio, closeTo(1 / 3, 0.001));
+  });
+
   test('rejects missing session detail', () async {
     final reader = FakeWorkoutHistoryReader(documents: []);
     final container = ProviderContainer(
@@ -207,6 +253,36 @@ WorkoutHistoryDocument _sessionDocument({
           'displayName': exerciseName,
           'sets': [
             {'reps': reps, 'externalWeightKg': loadKg},
+          ],
+        },
+      ],
+    },
+  );
+}
+
+WorkoutHistoryDocument _comparisonDocument({
+  required String id,
+  required DateTime completedAt,
+  required String exerciseName,
+  required double loadKg,
+  required int reps,
+  required int rir,
+  required List<String> targetMuscleIds,
+}) {
+  return WorkoutHistoryDocument(
+    id: id,
+    data: {
+      'completedAt': Timestamp.fromDate(completedAt),
+      'isDeleted': false,
+      'exercises': [
+        {
+          'displayName': exerciseName,
+          'targetMuscles': [
+            for (final muscleId in targetMuscleIds)
+              {'muscleId': muscleId, 'allocation': 1.0},
+          ],
+          'sets': [
+            {'order': 1, 'reps': reps, 'rir': rir, 'externalWeightKg': loadKg},
           ],
         },
       ],
