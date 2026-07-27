@@ -10,6 +10,7 @@ void main() {
     expect(AppRoutePaths.workout, '/workout');
     expect(AppRoutePaths.history, '/history');
     expect(AppRoutePaths.historyDetail('session-1'), '/history/session-1');
+    expect(AppRoutePaths.planNew, '/plans/new');
     expect(AppRoutePaths.ai, '/ai');
     expect(AppRoutePaths.settings, '/settings');
   });
