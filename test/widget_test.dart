@@ -9,6 +9,7 @@ import 'package:volume_fit/src/app/volume_fit_app.dart';
 import 'package:volume_fit/src/features/ai_export/data/ai_export_history_repository.dart';
 import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
+import 'package:volume_fit/src/features/workout/data/calculation_settings_repository.dart';
 import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
 import 'package:volume_fit/src/features/workout/data/workout_history_repository.dart';
 import 'package:volume_fit/src/features/workout/data/workout_plan_repository.dart';
@@ -28,7 +29,7 @@ void main() {
     expect(find.text('Volume Fit'), findsOneWidget);
     expect(find.text('筋トレ記録をAIへつなぐ'), findsOneWidget);
     expect(find.text('トレーニングを開始'), findsOneWidget);
-    expect(find.text('ログインして始める'), findsOneWidget);
+    expect(find.text('設定'), findsOneWidget);
     expect(find.text('DEVELOPMENT'), findsOneWidget);
 
     expect(find.text('Flutter Demo Home Page'), findsNothing);
@@ -378,6 +379,54 @@ void main() {
     expect(repository.lastDraft?.exerciseId, 'bench_press');
     expect(repository.lastDraft?.plannedSetCount, 3);
     expect(repository.lastDraft?.sourceAiExportHistoryId, 'ai-history-1');
+  });
+
+  testWidgets('creates custom calculation settings from settings screen', (
+    WidgetTester tester,
+  ) async {
+    final repository = _SuccessfulCalculationSettingsRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          calculationSettingsRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('設定'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('計算設定'), findsWidgets);
+    await tester.enterText(
+      find.byKey(const Key('customPushUpRatioField')),
+      '0.80',
+    );
+    await tester.enterText(find.byKey(const Key('customRir2Field')), '0.90');
+    await tester.enterText(find.byKey(const Key('customRir5Field')), '0.45');
+    await tester.enterText(
+      find.byKey(const Key('customUnknownRirField')),
+      '0.60',
+    );
+    await tester.enterText(
+      find.byKey(const Key('customChestAllocationField')),
+      '0.80',
+    );
+    await tester.ensureVisible(find.text('デフォルトに保存'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('デフォルトに保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('計算設定を保存しました'), findsOneWidget);
+    expect(repository.savedSettings?.bodyWeightLoadRatioFor('push_up'), 0.8);
+    expect(repository.savedSettings?.rirMultiplierFor(2), 0.9);
+    expect(
+      repository.savedSettings?.muscleAllocations['push_up']?['chest'],
+      0.8,
+    );
   });
 
   testWidgets('opens workout session detail from history list', (
@@ -1141,6 +1190,19 @@ class _SuccessfulWorkoutPlanRepository implements WorkoutPlanRepository {
   @override
   Future<void> savePlan(WorkoutPlanDraft draft) async {
     lastDraft = draft;
+  }
+}
+
+class _SuccessfulCalculationSettingsRepository
+    implements CalculationSettingsRepository {
+  CalculationSettings? savedSettings;
+
+  @override
+  Future<CalculationSettings?> fetchDefault() async => savedSettings;
+
+  @override
+  Future<void> saveDefault(CalculationSettings settings) async {
+    savedSettings = settings;
   }
 }
 

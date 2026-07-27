@@ -115,11 +115,11 @@ class HomeScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 OutlinedButton(
-                  onPressed: () {},
+                  onPressed: () => context.go(AppRoutePaths.settings),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: colorScheme.primary,
                   ),
-                  child: const Text('ログインして始める'),
+                  child: const Text('設定'),
                 ),
               ],
             ),
