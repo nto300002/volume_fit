@@ -8,6 +8,7 @@ import '../features/ai_export/presentation/ai_export_screen.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/profile/presentation/initial_profile_screen.dart';
+import '../features/workout/presentation/calculation_settings_screen.dart';
 import '../features/workout/presentation/workout_history_screen.dart';
 import '../features/workout/presentation/workout_plan_screen.dart';
 import '../features/workout/presentation/workout_set_input_screen.dart';
@@ -88,7 +89,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: AppRoutePaths.settings,
-        builder: (context, state) => const RoutePlaceholderScreen(title: '設定'),
+        builder: (context, state) => const CalculationSettingsScreen(),
       ),
     ],
   );

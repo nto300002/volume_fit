@@ -258,7 +258,7 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
           ? '未設定'
           : exerciseNames.join(' / '),
       setCount: sets.length,
-      totalVolumeKg: _totalVolumeKg(data, sets),
+      totalVolumeKg: _totalVolumeKg(data),
     );
   }
 
@@ -274,29 +274,40 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
     return null;
   }
 
-  double _totalVolumeKg(
-    Map<String, Object?> sessionData,
-    List<Map<String, Object?>> sets,
-  ) {
+  double _totalVolumeKg(Map<String, Object?> sessionData) {
     final storedTotal = sessionData['totalVolumeKg'];
     if (storedTotal is num) {
       return storedTotal.toDouble();
     }
 
-    return sets.fold(0, (total, set) {
-      final reps = (set['reps'] as num?)?.toInt() ?? 0;
-      return total + _estimatedLoadKg(set) * reps;
-    });
+    return (sessionData['exercises'] as List<Object?>? ?? const [])
+        .whereType<Map<String, Object?>>()
+        .fold(0.0, (sessionTotal, exercise) {
+          final exerciseId = exercise['exerciseId'] as String?;
+          final exerciseSets = (exercise['sets'] as List<Object?>? ?? const [])
+              .whereType<Map<String, Object?>>()
+              .toList();
+          return sessionTotal +
+              exerciseSets.fold(0.0, (exerciseTotal, set) {
+                final reps = (set['reps'] as num?)?.toInt() ?? 0;
+                return exerciseTotal +
+                    _estimatedLoadKg(set, exerciseId: exerciseId) * reps;
+              });
+        });
   }
 
-  double _estimatedLoadKg(Map<String, Object?> set) {
+  double _estimatedLoadKg(Map<String, Object?> set, {String? exerciseId}) {
     final externalWeight = set['externalWeightKg'];
     if (externalWeight is num) {
       return externalWeight.toDouble();
     }
 
     final bodyWeight = (set['bodyWeightKg'] as num?)?.toDouble() ?? 0;
-    final ratio = (set['bodyWeightLoadRatio'] as num?)?.toDouble() ?? 0;
+    final activeRatio = exerciseId == null
+        ? null
+        : calculationSettings.bodyWeightLoadRatioFor(exerciseId);
+    final ratio =
+        activeRatio ?? (set['bodyWeightLoadRatio'] as num?)?.toDouble() ?? 0;
     final added = (set['addedWeightKg'] as num?)?.toDouble() ?? 0;
     final assistance = (set['assistanceWeightKg'] as num?)?.toDouble() ?? 0;
     return bodyWeight * ratio + added - assistance;
@@ -402,9 +413,10 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
   }
 
   WorkoutSessionDetailExercise _detailExercise(Map<String, Object?> exercise) {
+    final exerciseId = exercise['exerciseId'] as String?;
     final sets = (exercise['sets'] as List<Object?>? ?? const [])
         .whereType<Map<String, Object?>>()
-        .map(_detailSet)
+        .map((set) => _detailSet(set, exerciseId: exerciseId))
         .toList();
 
     return WorkoutSessionDetailExercise(
@@ -413,10 +425,13 @@ class FirestoreWorkoutHistoryRepository implements WorkoutHistoryRepository {
     );
   }
 
-  WorkoutSessionDetailSet _detailSet(Map<String, Object?> set) {
+  WorkoutSessionDetailSet _detailSet(
+    Map<String, Object?> set, {
+    String? exerciseId,
+  }) {
     final reps = (set['reps'] as num?)?.toInt() ?? 0;
     final rir = (set['rir'] as num?)?.toInt();
-    final estimatedLoad = _estimatedLoadKg(set);
+    final estimatedLoad = _estimatedLoadKg(set, exerciseId: exerciseId);
     final setVolume = estimatedLoad * reps;
     return WorkoutSessionDetailSet(
       order: (set['order'] as num?)?.toInt() ?? 1,

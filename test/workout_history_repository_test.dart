@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
 import 'package:volume_fit/src/features/workout/data/workout_history_repository.dart';
 import 'package:volume_fit/src/features/workout/data/workout_set_input_repository.dart';
 
@@ -126,6 +127,58 @@ void main() {
       expect(detail.totalVolumeKg, closeTo(691.2, 0.001));
     },
   );
+
+  test('recalculates bodyweight history with active custom settings', () async {
+    final reader = FakeWorkoutHistoryReader(
+      documents: [
+        WorkoutHistoryDocument(
+          id: 'session-1',
+          data: {
+            'completedAt': Timestamp.fromDate(DateTime.utc(2026, 7, 25, 12)),
+            'isDeleted': false,
+            'exercises': [
+              {
+                'exerciseId': 'push_up',
+                'displayName': '腕立て伏せ',
+                'sets': [
+                  {
+                    'order': 1,
+                    'reps': 10,
+                    'rir': 2,
+                    'bodyWeightKg': 80,
+                    'bodyWeightLoadRatio': 0.72,
+                    'addedWeightKg': 0,
+                    'assistanceWeightKg': 0,
+                  },
+                ],
+              },
+            ],
+          },
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        currentAuthUserIdProvider.overrideWithValue('uid-1'),
+        workoutHistoryReaderProvider.overrideWithValue(reader),
+        calculationSettingsProvider.overrideWithValue(
+          const CalculationSettings(
+            bodyWeightLoadRatios: {'push_up': 0.8},
+            rirMultipliers: {0: 1, 1: 1, 2: 0.9},
+          ),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final detail = await container
+        .read(workoutHistoryRepositoryProvider)
+        .fetchSessionDetail('session-1');
+
+    expect(detail.exercises.single.sets.single.estimatedLoadKg, 64);
+    expect(detail.exercises.single.sets.single.setVolumeKg, 640);
+    expect(detail.exercises.single.sets.single.effortAdjustedVolumeKg, 576);
+  });
 
   test('compares a workout session detail with the previous record', () async {
     final currentDate = DateTime.utc(2026, 7, 25, 12);
