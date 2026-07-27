@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../../workout/domain/hard_set_judge.dart';
 import '../../workout/domain/rir_adjusted_volume_calculator.dart';
 import '../../workout/domain/set_volume_calculator.dart';
 import '../data/ai_export_history_repository.dart';
+import '../domain/ai_json_exporter.dart';
 import '../domain/ai_markdown_generator.dart';
 
 class AiExportScreen extends ConsumerStatefulWidget {
@@ -26,6 +29,8 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
   final _assistanceWeightController = TextEditingController();
   int? _rir;
   String? _markdown;
+  Map<String, Object?>? _jsonContent;
+  String? _jsonPreview;
   Map<String, Object?>? _calculationSnapshot;
   bool _isSavingHistory = false;
   String? _successMessage;
@@ -178,6 +183,28 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
                       child: SelectableText(_markdown!),
                     ),
                   ),
+                  if (_jsonPreview != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'JSONプレビュー',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: SelectableText(_jsonPreview!),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 12),
                   OutlinedButton(
                     key: const Key('aiSaveHistoryButton'),
@@ -211,6 +238,8 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
       setState(() {
         _errorMessage = '体重を入力してください';
         _markdown = null;
+        _jsonContent = null;
+        _jsonPreview = null;
       });
       return;
     }
@@ -219,6 +248,8 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
       setState(() {
         _errorMessage = '回数は1回以上で入力してください';
         _markdown = null;
+        _jsonContent = null;
+        _jsonPreview = null;
       });
       return;
     }
@@ -227,6 +258,8 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
       setState(() {
         _errorMessage = '入力値を確認してください';
         _markdown = null;
+        _jsonContent = null;
+        _jsonPreview = null;
       });
       return;
     }
@@ -248,6 +281,40 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
           settings: ref.read(calculationSettingsProvider),
         );
     final isHardSet = const HardSetJudge().isHardSet(_rir);
+    final request = AiMarkdownRequest(
+      purpose: '今日の評価と次回メニュー作成',
+      sessions: [
+        AiMarkdownSession(
+          sessionLabel: '今回のトレーニング',
+          bodyWeightKg: bodyWeight,
+          exercises: [
+            AiMarkdownExercise(
+              name: '腕立て伏せ',
+              sets: [
+                AiMarkdownSet(
+                  order: 1,
+                  reps: reps,
+                  rir: _rir,
+                  bodyWeightKg: bodyWeight,
+                  bodyWeightLoadRatio: ratio,
+                  addedWeightKg: addedWeight,
+                  assistanceWeightKg: assistanceWeight,
+                  estimatedLoadKg: estimatedLoad,
+                  setVolumeKg: setVolume,
+                  effortAdjustedVolumeKg: effortAdjustedVolume,
+                  isHardSet: isHardSet,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    final jsonContent = const AiJsonExporter().generate(
+      request,
+      calculationVersion: CalculationSettings.standardVersion,
+      promptVersion: 'prompt-v1',
+    );
 
     setState(() {
       _errorMessage = null;
@@ -265,44 +332,19 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
           },
         ],
       };
-      _markdown = const AiMarkdownGenerator().generate(
-        AiMarkdownRequest(
-          purpose: '今日の評価と次回メニュー作成',
-          sessions: [
-            AiMarkdownSession(
-              sessionLabel: '今回のトレーニング',
-              bodyWeightKg: bodyWeight,
-              exercises: [
-                AiMarkdownExercise(
-                  name: '腕立て伏せ',
-                  sets: [
-                    AiMarkdownSet(
-                      order: 1,
-                      reps: reps,
-                      rir: _rir,
-                      bodyWeightKg: bodyWeight,
-                      bodyWeightLoadRatio: ratio,
-                      addedWeightKg: addedWeight,
-                      assistanceWeightKg: assistanceWeight,
-                      estimatedLoadKg: estimatedLoad,
-                      setVolumeKg: setVolume,
-                      effortAdjustedVolumeKg: effortAdjustedVolume,
-                      isHardSet: isHardSet,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
+      _jsonContent = jsonContent;
+      _jsonPreview = const JsonEncoder.withIndent('  ').convert(jsonContent);
+      _markdown = const AiMarkdownGenerator().generate(request);
     });
   }
 
   Future<void> _saveHistory() async {
     final markdown = _markdown;
+    final jsonContent = _jsonContent;
     final calculationSnapshot = _calculationSnapshot;
-    if (markdown == null || calculationSnapshot == null) {
+    if (markdown == null ||
+        jsonContent == null ||
+        calculationSnapshot == null) {
       setState(() {
         _successMessage = null;
         _errorMessage = 'Markdownを生成してください';
@@ -326,8 +368,8 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
               purpose: 'daily_review',
               targetAiService: 'chatgpt',
               markdownContent: markdown,
-              jsonContent: const {},
-              calculationVersion: 'standard-v1',
+              jsonContent: jsonContent,
+              calculationVersion: CalculationSettings.standardVersion,
               promptVersion: 'prompt-v1',
               calculationSnapshot: calculationSnapshot,
               customInstruction: null,

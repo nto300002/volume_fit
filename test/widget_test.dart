@@ -802,8 +802,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Markdownプレビュー'), findsOneWidget);
-    expect(find.textContaining('記録上確認できる事実と推定を分けてください。'), findsOneWidget);
-    expect(find.textContaining('アプリの計算値は比較用の概算です。'), findsOneWidget);
+    expect(find.textContaining('記録上確認できる事実と推定を分けてください。'), findsWidgets);
+    expect(find.textContaining('アプリの計算値は比較用の概算です。'), findsWidgets);
     expect(
       find.textContaining('最後にNotionへ保存しやすいMarkdownを出力してください。'),
       findsOneWidget,
@@ -816,6 +816,12 @@ void main() {
       find.textContaining('| 1 | 57.6 kg | 691.2 kg | 656.6 kg | ハードセット |'),
       findsOneWidget,
     );
+    expect(find.text('JSONプレビュー'), findsOneWidget);
+    expect(
+      find.textContaining('"format": "volume_fit_ai_export"'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('"estimatedLoadKg": 57.6'), findsOneWidget);
   });
 
   testWidgets('saves generated AI markdown history', (
@@ -852,6 +858,16 @@ void main() {
     expect(find.text('AI出力履歴を保存しました'), findsOneWidget);
     expect(repository.saveCallCount, 1);
     expect(repository.lastDraft?.markdownContent, contains('# AIトレーニングレビュー依頼'));
+    expect(repository.lastDraft?.jsonContent['format'], 'volume_fit_ai_export');
+    expect(repository.lastDraft?.jsonContent['purpose'], '今日の評価と次回メニュー作成');
+    final sessions =
+        repository.lastDraft?.jsonContent['sessions'] as List<Object?>;
+    final session = sessions.single as Map<String, Object?>;
+    final exercises = session['exercises'] as List<Object?>;
+    final exercise = exercises.single as Map<String, Object?>;
+    final jsonSets = exercise['sets'] as List<Object?>;
+    final jsonSet = jsonSets.single as Map<String, Object?>;
+    expect(jsonSet['estimatedLoadKg'], closeTo(57.6, 0.001));
     expect(repository.lastDraft?.calculationVersion, 'standard-v1');
     expect(repository.lastDraft?.promptVersion, 'prompt-v1');
     final snapshot = repository.lastDraft?.calculationSnapshot;
