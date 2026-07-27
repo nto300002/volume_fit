@@ -11,6 +11,7 @@ import 'package:volume_fit/src/features/auth/data/auth_repository.dart';
 import 'package:volume_fit/src/features/profile/data/profile_repository.dart';
 import 'package:volume_fit/src/features/workout/data/calculation_settings.dart';
 import 'package:volume_fit/src/features/workout/data/workout_history_repository.dart';
+import 'package:volume_fit/src/features/workout/data/workout_plan_repository.dart';
 import 'package:volume_fit/src/features/workout/data/workout_set_input_repository.dart';
 
 void main() {
@@ -323,6 +324,60 @@ void main() {
     expect(find.text('600.0 kg'), findsOneWidget);
     expect(find.text('腕立て伏せ'), findsOneWidget);
     expect(find.text('2セット'), findsOneWidget);
+  });
+
+  testWidgets('creates a next workout plan from home', (
+    WidgetTester tester,
+  ) async {
+    final repository = _SuccessfulWorkoutPlanRepository();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          isAuthenticatedProvider.overrideWithValue(true),
+          workoutPlanRepositoryProvider.overrideWithValue(repository),
+        ],
+        child: const VolumeFitApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('次回予定を作成'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('次回予定'), findsWidgets);
+
+    await tester.enterText(
+      find.byKey(const Key('workoutPlanDateField')),
+      '2026-07-30',
+    );
+    await tester.tap(find.byKey(const Key('workoutPlanExerciseDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ベンチプレス').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('workoutPlanLoadField')), '60');
+    await tester.enterText(find.byKey(const Key('workoutPlanRepsField')), '10');
+    await tester.enterText(
+      find.byKey(const Key('workoutPlanSetCountField')),
+      '3',
+    );
+    await tester.tap(find.byKey(const Key('workoutPlanTargetRirDropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RIR 2').last);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workoutPlanSourceAiHistoryField')),
+      'ai-history-1',
+    );
+    await tester.ensureVisible(find.text('保存'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('次回予定を保存しました'), findsOneWidget);
+    expect(repository.lastDraft?.exerciseId, 'bench_press');
+    expect(repository.lastDraft?.plannedSetCount, 3);
+    expect(repository.lastDraft?.sourceAiExportHistoryId, 'ai-history-1');
   });
 
   testWidgets('opens workout session detail from history list', (
@@ -1077,6 +1132,15 @@ class _SuccessfulWorkoutHistoryRepository implements WorkoutHistoryRepository {
     }
 
     return detail;
+  }
+}
+
+class _SuccessfulWorkoutPlanRepository implements WorkoutPlanRepository {
+  WorkoutPlanDraft? lastDraft;
+
+  @override
+  Future<void> savePlan(WorkoutPlanDraft draft) async {
+    lastDraft = draft;
   }
 }
 

@@ -9,6 +9,7 @@ import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/profile/presentation/initial_profile_screen.dart';
 import '../features/workout/presentation/workout_history_screen.dart';
+import '../features/workout/presentation/workout_plan_screen.dart';
 import '../features/workout/presentation/workout_set_input_screen.dart';
 
 class AppRoutePaths {
@@ -20,6 +21,7 @@ class AppRoutePaths {
   static const workout = '/workout';
   static const history = '/history';
   static String historyDetail(String sessionId) => '/history/$sessionId';
+  static const planNew = '/plans/new';
   static const ai = '/ai';
   static const settings = '/settings';
 }
@@ -75,6 +77,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => WorkoutSessionDetailScreen(
           sessionId: state.pathParameters['sessionId'] ?? '',
         ),
+      ),
+      GoRoute(
+        path: AppRoutePaths.planNew,
+        builder: (context, state) => const WorkoutPlanScreen(),
       ),
       GoRoute(
         path: AppRoutePaths.ai,
