@@ -12,7 +12,9 @@ import '../../workout/domain/hard_set_judge.dart';
 import '../../workout/domain/rir_adjusted_volume_calculator.dart';
 import '../../workout/domain/set_volume_calculator.dart';
 import '../data/ai_export_history_repository.dart';
+import '../data/ai_json_import_repository.dart';
 import '../domain/ai_json_exporter.dart';
+import '../domain/ai_json_importer.dart';
 import '../domain/ai_markdown_generator.dart';
 
 class AiExportScreen extends ConsumerStatefulWidget {
@@ -27,12 +29,14 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
   final _repsController = TextEditingController();
   final _addedWeightController = TextEditingController();
   final _assistanceWeightController = TextEditingController();
+  final _jsonImportController = TextEditingController();
   int? _rir;
   String? _markdown;
   Map<String, Object?>? _jsonContent;
   String? _jsonPreview;
   Map<String, Object?>? _calculationSnapshot;
   bool _isSavingHistory = false;
+  bool _isImportingJson = false;
   String? _successMessage;
   String? _errorMessage;
 
@@ -42,6 +46,7 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
     _repsController.dispose();
     _addedWeightController.dispose();
     _assistanceWeightController.dispose();
+    _jsonImportController.dispose();
     super.dispose();
   }
 
@@ -217,6 +222,44 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
                         : const Text('履歴保存'),
                   ),
                 ],
+                const SizedBox(height: 32),
+                const Divider(),
+                const SizedBox(height: 20),
+                Text(
+                  'JSONインポート',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Volume Fit でエクスポートした JSON を入力してください。',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('aiJsonImportField'),
+                  controller: _jsonImportController,
+                  enabled: !_isImportingJson,
+                  minLines: 6,
+                  maxLines: 12,
+                  decoration: const InputDecoration(
+                    labelText: 'JSON',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const Key('aiJsonImportButton'),
+                  onPressed: _isImportingJson ? null : _importJson,
+                  child: _isImportingJson
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('JSONを取り込む'),
+                ),
               ],
             ),
           ),
@@ -382,6 +425,37 @@ class _AiExportScreenState extends ConsumerState<AiExportScreen> {
     } on AiExportHistoryFailure catch (error) {
       setState(() {
         _isSavingHistory = false;
+        _errorMessage = error.message;
+      });
+    }
+  }
+
+  Future<void> _importJson() async {
+    try {
+      final payload = const AiJsonImporter().parse(_jsonImportController.text);
+      setState(() {
+        _isImportingJson = true;
+        _errorMessage = null;
+        _successMessage = null;
+      });
+      await ref.read(aiJsonImportRepositoryProvider).importPayload(payload);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isImportingJson = false;
+        _successMessage = '${payload.sessions.length}件のセッションを取り込みました';
+      });
+    } on AiJsonImportFailure catch (error) {
+      setState(() {
+        _isImportingJson = false;
+        _successMessage = null;
+        _errorMessage = error.message;
+      });
+    } on AiJsonImportRepositoryFailure catch (error) {
+      setState(() {
+        _isImportingJson = false;
+        _successMessage = null;
         _errorMessage = error.message;
       });
     }
