@@ -36,11 +36,11 @@ class HomeScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -120,6 +120,14 @@ class HomeScreen extends ConsumerWidget {
                     foregroundColor: colorScheme.primary,
                   ),
                   child: const Text('設定'),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton(
+                  onPressed: () => context.go(AppRoutePaths.accountDelete),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: colorScheme.error,
+                  ),
+                  child: const Text('アカウント削除'),
                 ),
               ],
             ),

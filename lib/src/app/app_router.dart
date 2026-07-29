@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/application/email_registration_controller.dart';
 import '../features/auth/application/logout_controller.dart';
+import '../features/account/presentation/account_deletion_screen.dart';
 import '../features/ai_export/presentation/ai_export_screen.dart';
 import '../features/auth/presentation/email_registration_screen.dart';
 import '../features/home/presentation/home_screen.dart';
@@ -25,6 +26,7 @@ class AppRoutePaths {
   static const planNew = '/plans/new';
   static const ai = '/ai';
   static const settings = '/settings';
+  static const accountDelete = '/account/delete';
 }
 
 final isAuthenticatedProvider = Provider<bool>(
@@ -90,6 +92,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutePaths.settings,
         builder: (context, state) => const CalculationSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutePaths.accountDelete,
+        builder: (context, state) => const AccountDeletionScreen(),
       ),
     ],
   );
