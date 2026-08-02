@@ -5,9 +5,10 @@ import '../app/app_environment.dart';
 FirebaseOptions firebaseOptionsFor(AppEnvironmentConfig config) {
   return switch (config.environment) {
     AppEnvironment.development => _options(
-      projectId: 'training-ai-dev',
-      appId: '1:100000000001:web:volume-fit-dev',
-      messagingSenderId: '100000000001',
+      projectId: 'volume-fit-dev',
+      appId: '1:325793484975:web:a09c2e6539f03925a5445a',
+      messagingSenderId: '325793484975',
+      apiKey: 'AIzaSyA6U0EwHyQPTXaKk4qegfc01r2Dp7m-mZ8',
     ),
     AppEnvironment.staging => _options(
       projectId: 'training-ai-stg',
@@ -26,10 +27,11 @@ FirebaseOptions _options({
   required String projectId,
   required String appId,
   required String messagingSenderId,
+  String? apiKey,
 }) {
   // Replace these placeholder values with FlutterFire CLI output per project.
   return FirebaseOptions(
-    apiKey: 'replace-with-$projectId-web-api-key',
+    apiKey: apiKey ?? 'replace-with-$projectId-web-api-key',
     appId: appId,
     messagingSenderId: messagingSenderId,
     projectId: projectId,

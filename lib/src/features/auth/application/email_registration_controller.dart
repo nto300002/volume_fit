@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 
+final initialAuthSessionProvider = Provider<bool>((ref) => false);
+
 final authSessionProvider = NotifierProvider<AuthSessionController, bool>(
   AuthSessionController.new,
 );
@@ -24,7 +26,7 @@ class EmailRegistrationState {
 
 class AuthSessionController extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() => ref.watch(initialAuthSessionProvider);
 
   void markAuthenticated() {
     state = true;

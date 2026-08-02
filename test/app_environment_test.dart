@@ -28,7 +28,7 @@ void main() {
     test('keeps Firebase project ids separated by environment', () {
       expect(
         AppEnvironmentConfig.parse('development').firebaseProjectId,
-        'training-ai-dev',
+        'volume-fit-dev',
       );
       expect(
         AppEnvironmentConfig.parse('staging').firebaseProjectId,
