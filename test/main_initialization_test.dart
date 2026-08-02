@@ -9,6 +9,8 @@ void main() {
     expect(mainSource, contains('WidgetsFlutterBinding.ensureInitialized()'));
     expect(mainSource, contains('Firebase.initializeApp'));
     expect(mainSource, contains('firebaseOptionsFor(AppEnvironmentConfig.current())'));
+    expect(mainSource, contains('FirebaseAuth.instance.currentUser != null'));
+    expect(mainSource, contains('initialAuthSessionProvider.overrideWithValue'));
     expect(mainSource, contains('ProviderScope'));
   });
 }

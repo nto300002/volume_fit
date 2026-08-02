@@ -17,7 +17,7 @@ class AppEnvironmentConfig {
     return switch (normalized) {
       '' || 'development' || 'dev' => const AppEnvironmentConfig(
         environment: AppEnvironment.development,
-        firebaseProjectId: 'training-ai-dev',
+        firebaseProjectId: 'volume-fit-dev',
       ),
       'staging' || 'stg' => const AppEnvironmentConfig(
         environment: AppEnvironment.staging,

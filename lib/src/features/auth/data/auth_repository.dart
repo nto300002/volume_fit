@@ -41,6 +41,23 @@ class AuthFailure implements Exception {
   final String message;
 }
 
+String loginFailureMessageForCode(String code) {
+  return switch (code) {
+    'invalid-email' => 'メールアドレスの形式を確認してください',
+    'invalid-credential' ||
+    'user-not-found' ||
+    'wrong-password' => 'メールアドレスまたはパスワードが正しくありません',
+    'api-key-not-valid' ||
+    'invalid-api-key' =>
+      'Firebase の接続設定が正しくありません。管理者にお問い合わせください',
+    'too-many-requests' => '試行回数が多すぎます。しばらくしてから再度お試しください',
+    'user-disabled' => 'このアカウントは無効化されています。管理者にお問い合わせください',
+    'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
+    'network-request-failed' => '通信に失敗しました。接続を確認してください',
+    _ => 'ログインに失敗しました。時間をおいて再度お試しください',
+  };
+}
+
 class FirebaseAuthRepository implements AuthRepository {
   const FirebaseAuthRepository(this._auth);
 
@@ -145,6 +162,11 @@ class FirebaseAuthRepository implements AuthRepository {
       'invalid-email' => 'メールアドレスの形式を確認してください',
       'weak-password' => 'パスワードは6文字以上で入力してください',
       'email-already-in-use' => 'このメールアドレスはすでに登録されています',
+      'api-key-not-valid' ||
+      'invalid-api-key' =>
+        'Firebase の接続設定が正しくありません。管理者にお問い合わせください',
+      'too-many-requests' => '試行回数が多すぎます。しばらくしてから再度お試しください',
+      'user-disabled' => 'このアカウントは無効化されています。管理者にお問い合わせください',
       'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
       'network-request-failed' => '通信に失敗しました。接続を確認してください',
       _ => '登録に失敗しました。時間をおいて再度お試しください',
@@ -152,15 +174,7 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   String _loginMessageForCode(String code) {
-    return switch (code) {
-      'invalid-email' => 'メールアドレスの形式を確認してください',
-      'invalid-credential' ||
-      'user-not-found' ||
-      'wrong-password' => 'メールアドレスまたはパスワードが正しくありません',
-      'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
-      'network-request-failed' => '通信に失敗しました。接続を確認してください',
-      _ => 'ログインに失敗しました。時間をおいて再度お試しください',
-    };
+    return loginFailureMessageForCode(code);
   }
 
   String _googleLoginMessageForCode(String code) {

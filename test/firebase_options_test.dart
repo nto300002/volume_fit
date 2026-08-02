@@ -11,8 +11,11 @@ void main() {
       );
 
       expect(options, isA<FirebaseOptions>());
-      expect(options.projectId, 'training-ai-dev');
-      expect(options.authDomain, 'training-ai-dev.firebaseapp.com');
+      expect(options.projectId, 'volume-fit-dev');
+      expect(options.appId, '1:325793484975:web:a09c2e6539f03925a5445a');
+      expect(options.messagingSenderId, '325793484975');
+      expect(options.apiKey, 'AIzaSyA6U0EwHyQPTXaKk4qegfc01r2Dp7m-mZ8');
+      expect(options.authDomain, 'volume-fit-dev.firebaseapp.com');
     });
 
     test('returns staging Firebase options', () {

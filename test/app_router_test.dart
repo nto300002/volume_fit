@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:volume_fit/src/app/app_router.dart';
+import 'package:volume_fit/src/features/auth/application/email_registration_controller.dart';
 
 void main() {
   test('defines the main route paths', () {
@@ -20,5 +21,14 @@ void main() {
     addTearDown(container.dispose);
 
     expect(container.read(isAuthenticatedProvider), isFalse);
+  });
+
+  test('uses the bootstrapped Firebase authentication state', () {
+    final container = ProviderContainer(
+      overrides: [initialAuthSessionProvider.overrideWithValue(true)],
+    );
+    addTearDown(container.dispose);
+
+    expect(container.read(isAuthenticatedProvider), isTrue);
   });
 }
