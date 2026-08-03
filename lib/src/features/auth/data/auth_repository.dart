@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>(
@@ -85,7 +86,8 @@ class FirebaseAuthRepository implements AuthRepository {
         emailVerified: user.emailVerified,
       );
     } on FirebaseAuthException catch (error) {
-      throw AuthFailure(_registrationMessageForCode(error.code));
+      _logDevelopmentAuthFailure('registration', error);
+      throw AuthFailure(registrationFailureMessageForCode(error.code));
     }
   }
 
@@ -111,6 +113,7 @@ class FirebaseAuthRepository implements AuthRepository {
         emailVerified: user.emailVerified,
       );
     } on FirebaseAuthException catch (error) {
+      _logDevelopmentAuthFailure('login', error);
       throw AuthFailure(_loginMessageForCode(error.code));
     }
   }
@@ -135,6 +138,7 @@ class FirebaseAuthRepository implements AuthRepository {
         emailVerified: user.emailVerified,
       );
     } on FirebaseAuthException catch (error) {
+      _logDevelopmentAuthFailure('Google login', error);
       throw AuthFailure(_googleLoginMessageForCode(error.code));
     }
   }
@@ -144,6 +148,7 @@ class FirebaseAuthRepository implements AuthRepository {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } on FirebaseAuthException catch (error) {
+      _logDevelopmentAuthFailure('password reset', error);
       throw AuthFailure(_passwordResetMessageForCode(error.code));
     }
   }
@@ -155,22 +160,6 @@ class FirebaseAuthRepository implements AuthRepository {
     } on FirebaseAuthException {
       throw const AuthFailure('ログアウトに失敗しました');
     }
-  }
-
-  String _registrationMessageForCode(String code) {
-    return switch (code) {
-      'invalid-email' => 'メールアドレスの形式を確認してください',
-      'weak-password' => 'パスワードは6文字以上で入力してください',
-      'email-already-in-use' => 'このメールアドレスはすでに登録されています',
-      'api-key-not-valid' ||
-      'invalid-api-key' =>
-        'Firebase の接続設定が正しくありません。管理者にお問い合わせください',
-      'too-many-requests' => '試行回数が多すぎます。しばらくしてから再度お試しください',
-      'user-disabled' => 'このアカウントは無効化されています。管理者にお問い合わせください',
-      'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
-      'network-request-failed' => '通信に失敗しました。接続を確認してください',
-      _ => '登録に失敗しました。時間をおいて再度お試しください',
-    };
   }
 
   String _loginMessageForCode(String code) {
@@ -196,4 +185,31 @@ class FirebaseAuthRepository implements AuthRepository {
       _ => 'パスワード再設定メールの送信に失敗しました',
     };
   }
+
+  void _logDevelopmentAuthFailure(
+    String operation,
+    FirebaseAuthException error,
+  ) {
+    if (kDebugMode) {
+      debugPrint('Firebase Auth $operation failed: ${error.code}');
+    }
+  }
+}
+
+String registrationFailureMessageForCode(String code) {
+  return switch (code) {
+    'invalid-email' => 'メールアドレスの形式を確認してください',
+    'weak-password' => 'パスワードは6文字以上で入力してください',
+    'email-already-in-use' => 'このメールアドレスはすでに登録されています',
+    'admin-restricted-operation' =>
+      '現在、新規アカウント登録は利用できません。管理者にお問い合わせください',
+    'api-key-not-valid' ||
+    'invalid-api-key' =>
+      'Firebase の接続設定が正しくありません。管理者にお問い合わせください',
+    'too-many-requests' => '試行回数が多すぎます。しばらくしてから再度お試しください',
+    'user-disabled' => 'このアカウントは無効化されています。管理者にお問い合わせください',
+    'operation-not-allowed' => 'メールアドレス登録が有効になっていません',
+    'network-request-failed' => '通信に失敗しました。接続を確認してください',
+    _ => '登録に失敗しました。時間をおいて再度お試しください',
+  };
 }

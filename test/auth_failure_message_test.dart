@@ -31,4 +31,13 @@ void main() {
       );
     });
   });
+
+  group('registrationFailureMessageForCode', () {
+    test('identifies administrator-restricted sign-up', () {
+      expect(
+        registrationFailureMessageForCode('admin-restricted-operation'),
+        '現在、新規アカウント登録は利用できません。管理者にお問い合わせください',
+      );
+    });
+  });
 }
