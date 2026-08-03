@@ -139,7 +139,7 @@ void main() {
     expect(find.text('プロフィール'), findsWidgets);
   });
 
-  testWidgets('logs in with Google and moves to profile setup', (
+  testWidgets('does not show Google login until the provider is configured', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(
@@ -152,32 +152,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Googleでログイン'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('プロフィール'), findsWidgets);
-  });
-
-  testWidgets('shows an error when Google login fails', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          authRepositoryProvider.overrideWithValue(
-            _FailingAuthRepository(const AuthFailure('Googleログインに失敗しました')),
-          ),
-        ],
-        child: const VolumeFitApp(),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Googleでログイン'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Googleログインに失敗しました'), findsOneWidget);
-    expect(find.text('プロフィール'), findsNothing);
+    expect(find.text('Googleでログイン'), findsNothing);
   });
 
   testWidgets('shows an error when email login fails', (
