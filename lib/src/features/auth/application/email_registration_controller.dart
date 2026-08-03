@@ -72,6 +72,13 @@ class EmailRegistrationController
     } on AuthFailure catch (error) {
       state = AsyncData(EmailRegistrationState(errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = const AsyncData(
+        EmailRegistrationState(
+          errorMessage: '登録に失敗しました。時間をおいて再度お試しください',
+        ),
+      );
+      return false;
     }
   }
 

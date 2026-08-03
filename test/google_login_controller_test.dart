@@ -43,12 +43,32 @@ void main() {
       'Googleログインに失敗しました',
     );
   });
+
+  test('shows a recoverable message for an unexpected Google login failure', () async {
+    final repository = FakeAuthRepository(unexpectedFailure: true);
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final succeeded = await container
+        .read(googleLoginControllerProvider.notifier)
+        .login();
+
+    expect(succeeded, isFalse);
+    expect(container.read(authSessionProvider), isFalse);
+    expect(
+      container.read(googleLoginControllerProvider).value?.errorMessage,
+      'Googleログインに失敗しました。時間をおいて再度お試しください',
+    );
+  });
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.failure});
+  FakeAuthRepository({this.failure, this.unexpectedFailure = false});
 
   final AuthFailure? failure;
+  final bool unexpectedFailure;
   int googleLoginCallCount = 0;
 
   @override
@@ -74,6 +94,9 @@ class FakeAuthRepository implements AuthRepository {
     final failure = this.failure;
     if (failure != null) {
       throw failure;
+    }
+    if (unexpectedFailure) {
+      throw StateError('unexpected Google login failure');
     }
 
     return const AuthUser(

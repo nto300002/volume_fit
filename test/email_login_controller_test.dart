@@ -46,6 +46,25 @@ void main() {
     );
   });
 
+  test('shows a recoverable message for an unexpected login failure', () async {
+    final repository = FakeAuthRepository(unexpectedFailure: true);
+    final container = ProviderContainer(
+      overrides: [authRepositoryProvider.overrideWithValue(repository)],
+    );
+    addTearDown(container.dispose);
+
+    final succeeded = await container
+        .read(emailLoginControllerProvider.notifier)
+        .login(email: 'user@example.com', password: 'Password1');
+
+    expect(succeeded, isFalse);
+    expect(container.read(authSessionProvider), isFalse);
+    expect(
+      container.read(emailLoginControllerProvider).value?.errorMessage,
+      'ログインに失敗しました。時間をおいて再度お試しください',
+    );
+  });
+
   test('marks the session authenticated after login succeeds', () async {
     final repository = FakeAuthRepository();
     final container = ProviderContainer(
@@ -65,9 +84,10 @@ void main() {
 }
 
 class FakeAuthRepository implements AuthRepository {
-  FakeAuthRepository({this.failure});
+  FakeAuthRepository({this.failure, this.unexpectedFailure = false});
 
   final AuthFailure? failure;
+  final bool unexpectedFailure;
   int loginCallCount = 0;
 
   @override
@@ -88,6 +108,9 @@ class FakeAuthRepository implements AuthRepository {
     final failure = this.failure;
     if (failure != null) {
       throw failure;
+    }
+    if (unexpectedFailure) {
+      throw StateError('unexpected login failure');
     }
 
     return AuthUser(uid: 'uid-1', email: email, emailVerified: false);

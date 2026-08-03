@@ -52,6 +52,13 @@ class EmailLoginController extends AsyncNotifier<EmailLoginState> {
     } on AuthFailure catch (error) {
       state = AsyncData(EmailLoginState(errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = const AsyncData(
+        EmailLoginState(
+          errorMessage: 'ログインに失敗しました。時間をおいて再度お試しください',
+        ),
+      );
+      return false;
     }
   }
 

@@ -33,6 +33,13 @@ class GoogleLoginController extends AsyncNotifier<GoogleLoginState> {
     } on AuthFailure catch (error) {
       state = AsyncData(GoogleLoginState(errorMessage: error.message));
       return false;
+    } catch (_) {
+      state = const AsyncData(
+        GoogleLoginState(
+          errorMessage: 'Googleログインに失敗しました。時間をおいて再度お試しください',
+        ),
+      );
+      return false;
     }
   }
 }
