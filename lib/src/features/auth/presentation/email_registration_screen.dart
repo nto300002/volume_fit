@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/app_router.dart';
 import '../application/email_login_controller.dart';
 import '../application/email_registration_controller.dart';
-import '../application/google_login_controller.dart';
 import '../application/password_reset_controller.dart';
 
 class EmailRegistrationScreen extends ConsumerStatefulWidget {
@@ -34,18 +33,14 @@ class _EmailRegistrationScreenState
     final registrationState = registration.value;
     final login = ref.watch(emailLoginControllerProvider);
     final loginState = login.value;
-    final googleLogin = ref.watch(googleLoginControllerProvider);
-    final googleLoginState = googleLogin.value;
     final passwordReset = ref.watch(passwordResetControllerProvider);
     final passwordResetState = passwordReset.value;
     final isSubmitting =
         registration.isLoading
         || login.isLoading
-        || googleLogin.isLoading
         || passwordReset.isLoading;
     final errorMessage =
         passwordResetState?.errorMessage
-        ?? googleLoginState?.errorMessage
         ?? loginState?.errorMessage
         ?? registrationState?.errorMessage;
     final successMessage =
@@ -122,18 +117,6 @@ class _EmailRegistrationScreenState
                     ),
                     const SizedBox(height: 12),
                   ],
-                  OutlinedButton(
-                    onPressed: isSubmitting
-                        ? null
-                        : () => _submitGoogleLogin(context),
-                    child: isSubmitting && googleLogin.isLoading
-                        ? const SizedBox.square(
-                            dimension: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Googleでログイン'),
-                  ),
-                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: isSubmitting ? null : () => _submitLogin(context),
                     child: isSubmitting && login.isLoading
@@ -184,18 +167,6 @@ class _EmailRegistrationScreenState
           email: _emailController.text,
           password: _passwordController.text,
         );
-
-    if (!mounted) {
-      return;
-    }
-
-    _goToProfileWhenAuthenticated(succeeded);
-  }
-
-  Future<void> _submitGoogleLogin(BuildContext context) async {
-    final succeeded = await ref
-        .read(googleLoginControllerProvider.notifier)
-        .login();
 
     if (!mounted) {
       return;
